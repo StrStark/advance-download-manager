@@ -1,0 +1,26 @@
+# Build output
+/build/bin/
+/dist/
+*.part
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/wailsjs/
+frontend/package.json.md5
+
+# Android engine copy of the UI (filled by scripts/build-android.sh)
+mobile/dist/*
+!mobile/dist/.gitkeep
+
+# Local runtime data (docker compose volumes)
+/data/
+/downloads/
+
+# Editor / tool state
+.claude/
+.impeccable/
+.idea/
+.vscode/
+*.swp
+.DS_Store

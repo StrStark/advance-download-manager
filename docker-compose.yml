@@ -1,0 +1,18 @@
+# Headless ADM server. Start with:  ADM_PASSWORD=change-me docker compose up -d
+# then open http://localhost:8080 (user "admin").
+services:
+  adm:
+    build: .
+    image: adm:latest
+    container_name: adm
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADM_PASSWORD: ${ADM_PASSWORD:?set ADM_PASSWORD to protect the web UI}
+      ADM_USER: ${ADM_USER:-admin}
+    # Run as your own user so files in ./downloads belong to you.
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./data:/data
+      - ./downloads:/downloads

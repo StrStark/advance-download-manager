@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lets "Open" hand finished downloads to other apps via content:// URIs. -->
+<paths>
+    <external-path name="storage" path="." />
+    <files-path name="internal" path="." />
+</paths>

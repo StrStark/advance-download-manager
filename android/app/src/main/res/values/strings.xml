@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ADM</string>
+    <string name="channel_active">Active downloads</string>
+    <string name="channel_active_desc">Progress while downloads run in the background</string>
+    <string name="channel_done">Finished downloads</string>
+    <string name="channel_done_desc">A download finished or needs attention</string>
+    <string name="notif_preparing">Preparing downloads…</string>
+    <string name="notif_pause_all">Pause all</string>
+    <string name="notif_done_title">Download complete</string>
+    <string name="notif_timeout_title">Downloads paused</string>
+    <string name="notif_timeout_text">Android limits background transfers. Tap to resume.</string>
+    <string name="engine_failed">ADM could not start: %1$s</string>
+    <string name="no_app_to_open">No app can open this file</string>
+</resources>

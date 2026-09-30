@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=ADM
+GenericName=Download Manager
+Comment=Fast segmented downloads and batch downloading
+Exec=adm %U
+Icon=adm
+Terminal=false
+Categories=Network;FileTransfer;
+Keywords=download;downloader;manager;batch;accelerator;
+StartupNotify=true
+StartupWMClass=adm

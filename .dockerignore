@@ -1,0 +1,13 @@
+.git
+.claude
+.impeccable
+build/bin
+frontend/node_modules
+frontend/dist
+frontend/wailsjs
+docs
+data
+downloads
+dist
+android
+mobile/dist

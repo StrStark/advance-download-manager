@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ADM — Product & Technical Specification</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  @page :first { margin: 0; }
+  :root {
+    --ink: #0f172a; --ink2: #334155; --mute: #64748b; --line: #e2e8f0;
+    --bg2: #f8fafc; --accent: #6366f1; --accent2: #22d3ee; --ok: #10b981; --warn: #f59e0b; --bad: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Ubuntu Sans", "Noto Sans", sans-serif; color: var(--ink); font-size: 10.2pt; line-height: 1.5; margin: 0; }
+  code, pre, .mono { font-family: "Ubuntu Sans Mono", "DejaVu Sans Mono", monospace; font-size: 8.8pt; }
+  h1, h2, h3 { line-height: 1.2; letter-spacing: -0.01em; }
+  h2 { font-size: 17pt; margin: 0 0 4mm; padding-top: 2mm; break-after: avoid; }
+  h2 .num { color: var(--accent); margin-right: 3mm; }
+  h3 { font-size: 11.5pt; margin: 5mm 0 2mm; color: var(--ink); break-after: avoid; }
+  p { margin: 0 0 2.5mm; color: var(--ink2); }
+  ul { margin: 0 0 3mm; padding-left: 5mm; color: var(--ink2); }
+  li { margin: 0.6mm 0; }
+  section { break-before: page; }
+  section.cont { break-before: auto; margin-top: 8mm; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.2pt; break-inside: auto; }
+  th { text-align: left; background: var(--bg2); color: var(--mute); font-weight: 600; font-size: 8pt; text-transform: uppercase; letter-spacing: .05em; }
+  th, td { padding: 2mm 2.5mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr { break-inside: avoid; }
+  pre { background: #0f172a; color: #e2e8f0; border-radius: 3mm; padding: 4mm; margin: 2mm 0 4mm; white-space: pre-wrap; break-inside: avoid; line-height: 1.45; }
+  pre .c { color: #64748b; } pre .k { color: #a5b4fc; } pre .s { color: #67e8f9; }
+  code { background: #eef2ff; color: #4338ca; padding: 0 1mm; border-radius: 1mm; }
+  pre code { background: none; color: inherit; padding: 0; }
+  .pill { display: inline-block; font-size: 7.5pt; font-weight: 700; padding: .3mm 2mm; border-radius: 10mm; letter-spacing: .03em; }
+  .v1 { background: #d1fae5; color: #065f46; } .v2 { background: #e0e7ff; color: #3730a3; } .v3 { background: #f1f5f9; color: #475569; }
+  .callout { border-left: 1mm solid var(--accent); background: #eef2ff; padding: 3mm 4mm; border-radius: 0 2mm 2mm 0; margin: 3mm 0 4mm; break-inside: avoid; }
+  .callout p:last-child { margin: 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .card { border: 1px solid var(--line); border-radius: 3mm; padding: 3.5mm 4mm; break-inside: avoid; }
+  .card .card-title { margin: 0 0 1.5mm; font-size: 10pt; }
+  .card p { font-size: 9pt; margin: 0; }
+  figure { margin: 3mm 0 5mm; break-inside: avoid; }
+  figcaption { font-size: 8.5pt; color: var(--mute); margin-top: 1.5mm; text-align: center; }
+  .swatch { display: inline-block; width: 4mm; height: 4mm; border-radius: 1mm; vertical-align: -0.8mm; margin-right: 1.5mm; border: 1px solid rgba(0,0,0,.08); }
+
+  /* cover */
+  .cover { height: 297mm; width: 210mm; position: relative; overflow: hidden; background: #0b1020; color: #fff; padding: 28mm 22mm; }
+  .cover .glow1 { position: absolute; width: 170mm; height: 170mm; border-radius: 50%; background: radial-gradient(circle, rgba(99,102,241,.55), transparent 65%); top: -40mm; right: -60mm; }
+  .cover .glow2 { position: absolute; width: 150mm; height: 150mm; border-radius: 50%; background: radial-gradient(circle, rgba(34,211,238,.35), transparent 65%); bottom: -30mm; left: -50mm; }
+  .cover .inner { position: relative; }
+  .cover .logo { width: 22mm; height: 22mm; border-radius: 6mm; background: linear-gradient(135deg, #6366f1, #22d3ee); display: flex; align-items: center; justify-content: center; margin-bottom: 16mm; }
+  .cover .tag { color: #a5b4fc; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; font-size: 9pt; }
+  .cover h1 { font-size: 40pt; margin: 4mm 0 6mm; font-weight: 700; letter-spacing: -0.03em; }
+  .cover .sub { font-size: 14pt; color: #cbd5e1; max-width: 140mm; line-height: 1.45; }
+  .cover .meta { position: absolute; left: 22mm; bottom: 26mm; color: #94a3b8; font-size: 9.5pt; line-height: 1.8; }
+  .cover .meta b { color: #e2e8f0; font-weight: 600; }
+  .cover .bars { margin-top: 18mm; width: 130mm; }
+  .cover .bar { height: 3mm; border-radius: 2mm; background: rgba(255,255,255,.08); margin-bottom: 2.5mm; overflow: hidden; display: flex; gap: .8mm; }
+  .cover .bar i { display: block; height: 100%; border-radius: 2mm; }
+
+  .toc { columns: 2; column-gap: 10mm; margin-top: 4mm; }
+  .toc div { padding: 1.6mm 0; border-bottom: 1px dashed var(--line); break-inside: avoid; color: var(--ink2); }
+  .toc b { color: var(--accent); margin-right: 2mm; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="glow1"></div><div class="glow2"></div>
+  <div class="inner">
+    <div class="logo">
+      <svg width="12mm" height="12mm" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+    </div>
+    <div class="tag">Product &amp; Technical Specification</div>
+    <h1>ADM<br>Advance Download Manager</h1>
+    <div class="sub">A fast, modern, segmented download manager for Linux, written in Go, with a first-class batch download workflow.</div>
+    <div class="bars">
+      <div class="bar"><i style="width:22%;background:#6366f1"></i><i style="width:18%;background:#818cf8"></i><i style="width:25%;background:#22d3ee"></i><i style="width:12%;background:#67e8f9"></i></div>
+      <div class="bar"><i style="width:30%;background:#6366f1"></i><i style="width:30%;background:#818cf8"></i><i style="width:20%;background:#22d3ee"></i></div>
+      <div class="bar"><i style="width:15%;background:#6366f1"></i><i style="width:9%;background:#818cf8"></i></div>
+    </div>
+  </div>
+  <div class="meta">
+    <b>Version</b> 0.1 draft &nbsp;·&nbsp; <b>Date</b> 30 September 2026<br>
+    <b>Stack</b> Go · Wails v2 · Svelte · TypeScript · Tailwind CSS · SQLite<br>
+    <b>Platform</b> Linux (X11 / Wayland)
+  </div>
+</div>
+
+<!-- ============ TOC + OVERVIEW ============ -->
+<section style="break-before: auto;">
+  <h2>Contents</h2>
+  <div class="toc">
+    <div><b>1</b>Vision &amp; goals</div>
+    <div><b>2</b>Technology stack</div>
+    <div><b>3</b>Architecture</div>
+    <div><b>4</b>Download engine</div>
+    <div><b>5</b>Batch downloads</div>
+    <div><b>6</b>Queues, scheduling &amp; limits</div>
+    <div><b>7</b>Capture &amp; integration</div>
+    <div><b>8</b>Organization &amp; automation</div>
+    <div><b>9</b>UI / UX design</div>
+    <div><b>10</b>Data model</div>
+    <div><b>11</b>Non-functional requirements</div>
+    <div><b>12</b>Roadmap</div>
+    <div><b>13</b>Risks &amp; open questions</div>
+  </div>
+
+  <section class="cont">
+    <h2><span class="num">1</span>Vision &amp; goals</h2>
+    <p>Linux has capable download tools (<code>aria2</code>, <code>wget</code>, <code>curl</code>), but none pairs a strong engine with a polished desktop experience. ADM aims to be the Linux equivalent of IDM/FDM: it should saturate your connection, survive anything, and be pleasant to use.</p>
+    <div class="grid2">
+      <div class="card"><h3 class="card-title">⚡ Fast</h3><p>Dynamic multi-connection segmentation keeps every connection busy until the last byte.</p></div>
+      <div class="card"><h3 class="card-title">🛡 Resilient</h3><p>Pause and resume survive crashes, reboots, network drops and expired links.</p></div>
+      <div class="card"><h3 class="card-title">📦 Batch-native</h3><p>Hundreds of files handled as one unit: import, filter, rename, track, and retry only the failures.</p></div>
+      <div class="card"><h3 class="card-title">✨ Modern</h3><p>A clean, animated, keyboard-friendly UI with live per-segment visualization and dark/light themes.</p></div>
+    </div>
+    <h3>Non-goals for v1</h3>
+    <ul>
+      <li>Windows/macOS builds. The architecture allows them later, but they are not tested in v1.</li>
+      <li>BitTorrent, HLS/DASH video and site-specific extractors. These are planned for v2+.</li>
+      <li>Cloud sync or accounts.</li>
+    </ul>
+  </section>
+</section>
+
+<!-- ============ STACK ============ -->
+<section>
+  <h2><span class="num">2</span>Technology stack</h2>
+  <table>
+    <tr><th style="width:24%">Layer</th><th style="width:30%">Choice</th><th>Why</th></tr>
+    <tr><td>Language (core)</td><td>Go 1.23+</td><td>Goroutines fit concurrent segment workers naturally. The app ships as a single static binary with a strong <code>net/http</code> stack.</td></tr>
+    <tr><td>Desktop shell</td><td>Wails v2 (WebKitGTK 4.1)</td><td>Go backend with a web frontend gives full design freedom and native windowing. It builds to one binary of about 10–15 MB.</td></tr>
+    <tr><td>Frontend</td><td>Svelte 5 + TypeScript + Vite</td><td>Tiny runtime and fine-grained reactivity. This matters when you re-render dozens of progress bars many times per second.</td></tr>
+    <tr><td>Styling</td><td>Tailwind CSS v4 + design tokens</td><td>Consistent spacing, color and theme switching. Easy dark mode.</td></tr>
+    <tr><td>Icons</td><td>Lucide</td><td>A clean, consistent stroke icon set.</td></tr>
+    <tr><td>Persistence</td><td>SQLite via <code>modernc.org/sqlite</code></td><td>Pure Go (no cgo), transactional, and survives crashes.</td></tr>
+    <tr><td>Rate limiting</td><td><code>golang.org/x/time/rate</code></td><td>Token bucket at global, per-batch and per-job levels.</td></tr>
+    <tr><td>IPC</td><td>Unix socket + small JSON API</td><td>Used by the CLI companion and the browser extension's native host.</td></tr>
+    <tr><td>Packaging</td><td>AppImage, .deb, Flatpak (later)</td><td>Covers most distributions.</td></tr>
+  </table>
+  <div class="callout"><p><b>Why not GTK4/libadwaita or Fyne?</b> libadwaita looks native on GNOME but makes custom visuals (per-segment bars, sparklines, animated cards) hard. Fyne is hard to make feel premium. Wails keeps the engine in Go and gives the UI full web-grade flexibility.</p></div>
+  <h3>Build requirements</h3>
+  <pre>sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+wails build -tags webkit2_41</pre>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section>
+  <h2><span class="num">3</span>Architecture</h2>
+  <p>The engine is a standalone Go package with <b>no UI dependencies</b>. The desktop app, the CLI and the browser bridge are thin clients of the same core service. Communication is event-driven: the engine publishes state and progress events, and the UI subscribes to them.</p>
+  <figure>
+    <svg viewBox="0 0 700 390" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Ubuntu Sans, sans-serif">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker></defs>
+      <!-- clients -->
+      <rect x="20" y="15" width="200" height="60" rx="12" fill="#eef2ff" stroke="#6366f1"/>
+      <text x="120" y="40" text-anchor="middle" font-size="14" font-weight="700" fill="#312e81">Desktop UI</text>
+      <text x="120" y="60" text-anchor="middle" font-size="11" fill="#4338ca">Svelte · Wails bindings</text>
+      <rect x="250" y="15" width="200" height="60" rx="12" fill="#ecfeff" stroke="#06b6d4"/>
+      <text x="350" y="40" text-anchor="middle" font-size="14" font-weight="700" fill="#164e63">CLI  (adm)</text>
+      <text x="350" y="60" text-anchor="middle" font-size="11" fill="#0e7490">Unix socket client</text>
+      <rect x="480" y="15" width="200" height="60" rx="12" fill="#ecfeff" stroke="#06b6d4"/>
+      <text x="580" y="40" text-anchor="middle" font-size="14" font-weight="700" fill="#164e63">Browser extension</text>
+      <text x="580" y="60" text-anchor="middle" font-size="11" fill="#0e7490">native-messaging host</text>
+      <line x1="120" y1="75" x2="120" y2="112" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="350" y1="75" x2="350" y2="112" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="580" y1="75" x2="580" y2="112" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ar)"/>
+      <!-- api -->
+      <rect x="20" y="115" width="660" height="36" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+      <text x="350" y="138" text-anchor="middle" font-size="12" fill="#334155" font-weight="600">Service API — commands (Add, Pause, CreateBatch…) · Event bus (progress, state, logs)</text>
+      <line x1="350" y1="151" x2="350" y2="172" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ar)"/>
+      <!-- core -->
+      <rect x="20" y="175" width="660" height="150" rx="14" fill="#fff" stroke="#6366f1" stroke-width="1.5"/>
+      <text x="36" y="197" font-size="12" font-weight="700" fill="#6366f1">CORE ENGINE (package core)</text>
+      <g font-size="12" font-weight="600" fill="#0f172a" text-anchor="middle">
+        <rect x="36" y="208" width="146" height="44" rx="8" fill="#eef2ff"/><text x="109" y="235">Queue Manager</text>
+        <rect x="196" y="208" width="146" height="44" rx="8" fill="#eef2ff"/><text x="269" y="235">Batch Manager</text>
+        <rect x="356" y="208" width="146" height="44" rx="8" fill="#eef2ff"/><text x="429" y="235">Scheduler</text>
+        <rect x="516" y="208" width="148" height="44" rx="8" fill="#eef2ff"/><text x="590" y="235">Rate Limiter</text>
+        <rect x="36" y="264" width="226" height="44" rx="8" fill="#ecfeff"/><text x="149" y="291">Job → Segment workers</text>
+        <rect x="276" y="264" width="186" height="44" rx="8" fill="#ecfeff"/><text x="369" y="291">Protocol: HTTP(S)</text>
+        <rect x="476" y="264" width="188" height="44" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-dasharray="4 3"/><text x="570" y="291" fill="#64748b">FTP · Torrent · HLS</text>
+      </g>
+      <line x1="350" y1="325" x2="350" y2="345" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="140" y="348" width="200" height="34" rx="9" fill="#f8fafc" stroke="#cbd5e1"/>
+      <text x="240" y="370" text-anchor="middle" font-size="12" fill="#334155">SQLite  (jobs · segments · batches)</text>
+      <rect x="360" y="348" width="200" height="34" rx="9" fill="#f8fafc" stroke="#cbd5e1"/>
+      <text x="460" y="370" text-anchor="middle" font-size="12" fill="#334155">Filesystem  (.part files)</text>
+    </svg>
+    <figcaption>Figure 1. Layered architecture. Dashed boxes are post-v1 protocol handlers.</figcaption>
+  </figure>
+  <h3>Repository layout</h3>
+  <pre>adm/
+├── main.go, app.go          <span class="c">// Wails entry + bindings exposed to the frontend</span>
+├── internal/core/           <span class="c">// engine: manager, job, segment, batch, limiter</span>
+├── internal/store/          <span class="c">// SQLite persistence</span>
+├── internal/batch/          <span class="c">// URL pattern expansion, list parsing, rename templates</span>
+├── internal/probe/          <span class="c">// HEAD/range probing, filename detection</span>
+├── cmd/adm/                 <span class="c">// CLI companion (later)</span>
+└── frontend/                <span class="c">// Svelte + Tailwind UI</span></pre>
+</section>
+
+<!-- ============ ENGINE ============ -->
+<section>
+  <h2><span class="num">4</span>Download engine</h2>
+  <h3>4.1 Job lifecycle</h3>
+  <p><code>queued → probing → downloading ⇄ paused → verifying → completed</code>, plus <code>failed</code> (retryable) and <code>canceled</code>. Every transition is persisted before it is announced, so the on-disk state is never behind the UI.</p>
+
+  <h3>4.2 Probing</h3>
+  <ul>
+    <li>Send <code>HEAD</code>. If the server rejects it or gives no length, send <code>GET</code> with <code>Range: bytes=0-0</code> and read <code>Content-Range</code>.</li>
+    <li>Record the size, <code>Accept-Ranges</code>, <code>ETag</code>, <code>Last-Modified</code>, content type and the final URL after redirects.</li>
+    <li>Filename priority: <code>Content-Disposition</code> (including RFC 5987 <code>filename*</code>), then the final URL path, then a name generated from the MIME type.</li>
+  </ul>
+
+  <h3>4.3 Dynamic segmentation</h3>
+  <p>A file is split into <i>N</i> initial ranges (default 8, maximum 32). When a worker finishes its range, it <b>steals work</b>: it takes the active segment with the most bytes remaining and splits it in half. The original worker keeps the first half and the idle worker takes the second. Splitting stops below a minimum size (1 MiB). This avoids the "one slow tail segment" problem of static splitting.</p>
+  <pre><span class="k">type</span> Segment <span class="k">struct</span> {
+    ID         <span class="k">int</span>
+    Start, End <span class="k">int64</span>   <span class="c">// inclusive byte range; End may shrink when stolen from</span>
+    Done       <span class="k">int64</span>   <span class="c">// bytes written from Start</span>
+}
+<span class="c">// Workers write with os.File.WriteAt into one preallocated .part file,
+// so no merge step is needed. Progress is checkpointed to SQLite every ~1 s.</span></pre>
+  <ul>
+    <li>If the server doesn't support ranges, fall back to a single connection with no resume, and warn the user.</li>
+    <li>On resume, compare <code>ETag</code>/<code>Last-Modified</code>/size. If any has changed, restart the download (and ask the user first).</li>
+    <li>Each worker has its own retry with exponential backoff and jitter. <code>429</code>/<code>503</code> responses respect <code>Retry-After</code>.</li>
+    <li>If a worker hits repeated connection errors, the job lowers its connection count (adaptive backoff).</li>
+  </ul>
+
+  <h3>4.4 Integrity &amp; finalization</h3>
+  <ul>
+    <li>Optional checksum (MD5 / SHA-1 / SHA-256 / SHA-512) verified after completion.</li>
+    <li>Atomic finalize: <code>file.part</code> is fsynced, then renamed to <code>file</code>. The rename-on-conflict policy is applied here.</li>
+  </ul>
+
+  <h3>4.5 Protocol support</h3>
+  <table>
+    <tr><th>Protocol</th><th>Phase</th><th>Notes</th></tr>
+    <tr><td>HTTP / HTTPS (HTTP/1.1, HTTP/2)</td><td><span class="pill v1">v1</span></td><td>Custom headers, cookies, basic auth, referer, user-agent</td></tr>
+    <tr><td>Proxies: HTTP, SOCKS5</td><td><span class="pill v1">v1</span></td><td>Global or per job; system proxy detection</td></tr>
+    <tr><td>FTP / SFTP</td><td><span class="pill v2">v2</span></td><td>REST-based resume</td></tr>
+    <tr><td>BitTorrent / magnet</td><td><span class="pill v2">v2</span></td><td><code>anacrolix/torrent</code></td></tr>
+    <tr><td>HLS / DASH, site extractors</td><td><span class="pill v3">v3</span></td><td>Native HLS; optional <code>yt-dlp</code> backend</td></tr>
+  </table>
+</section>
+
+<!-- ============ BATCH ============ -->
+<section>
+  <h2><span class="num">5</span>Batch downloads</h2>
+  <p>A <b>batch</b> is a named group of downloads managed as one unit. Every item in a batch is a normal job linked by <code>batch_id</code>, so segmentation, pause/resume and retry work unchanged. The batch only adds grouping, aggregate reporting, ordering and batch-level policies.</p>
+
+  <h3>5.1 Ways to create a batch</h3>
+  <table>
+    <tr><th style="width:26%">Source</th><th>Behavior</th><th style="width:10%">Phase</th></tr>
+    <tr><td>Paste list</td><td>Multi-line text. Extracts every URL, ignores junk, and removes duplicates.</td><td><span class="pill v1">v1</span></td></tr>
+    <tr><td>Import file</td><td><code>.txt</code> (one per line), <code>.csv</code> (url, filename, folder), <code>.json</code>, <code>.metalink</code></td><td><span class="pill v1">v1</span></td></tr>
+    <tr><td>Pattern / range URL</td><td><code>img[001-250].jpg</code> (zero-padding kept), <code>[a-z]</code>, stepped <code>[0-100:5]</code>, several ranges in one URL. Shows a live preview and count.</td><td><span class="pill v1">v1</span></td></tr>
+    <tr><td>Page link grabber</td><td>Fetches the HTML and extracts <code>a[href]</code>, <code>img</code>, <code>video</code>, <code>source</code>. Filters by extension, regex, domain and size.</td><td><span class="pill v2">v2</span></td></tr>
+    <tr><td>Directory listing</td><td>"Index of /" and FTP folders with optional recursion, preserving the folder structure</td><td><span class="pill v2">v2</span></td></tr>
+    <tr><td>Browser "download all"</td><td>The extension sends the selected or all links as one batch</td><td><span class="pill v2">v2</span></td></tr>
+    <tr><td>Playlists</td><td>Through the <code>yt-dlp</code> backend</td><td><span class="pill v3">v3</span></td></tr>
+  </table>
+
+  <h3>5.2 Review dialog</h3>
+  <ul>
+    <li><b>Items table</b> with a checkbox, URL, detected name, size, type icon and probe status. A bounded worker pool (default 8) probes in parallel and fills in rows live.</li>
+    <li><b>Filters</b>: extension chips, min/max size, include/exclude regex, and "select all / invert".</li>
+    <li><b>Rename template</b> with a live preview. Tokens: <code>{name}</code> <code>{ext}</code> <code>{index}</code> <code>{index:03}</code> <code>{batch}</code> <code>{date}</code> <code>{host}</code>.</li>
+    <li><b>Destination</b>: a folder, an auto-created subfolder named after the batch, or the remote path structure kept.</li>
+    <li><b>Batch settings</b>: order (parallel or sequential), max parallel items, connections per item, speed limit, queue, and start (now, paused, or scheduled).</li>
+    <li><b>Conflict policy</b>: skip / overwrite / auto-rename / resume existing <code>.part</code>.</li>
+  </ul>
+
+  <h3>5.3 Running a batch</h3>
+  <ul>
+    <li>Appears as one <b>expandable card</b> with aggregate progress, combined speed, ETA and counters (<i>37 / 120 done · 2 failed</i>).</li>
+    <li><b>Group actions</b>: pause, resume, cancel, set priority, change limit, <b>retry failed only</b>.</li>
+    <li>Per-item control still works inside the expanded view. Items can be reordered by dragging.</li>
+    <li><b>Failure policy</b>: retry each item <i>k</i> times, then either continue with the others or stop the batch.</li>
+    <li><b>Per-host politeness</b>: a cap on total connections to one host across the batch, to avoid bans.</li>
+    <li><b>Link refresh</b>: re-import a list and match items by filename to swap in fresh signed URLs while keeping partial data.</li>
+  </ul>
+
+  <h3>5.4 After completion</h3>
+  <ul>
+    <li>One summary notification (<i>"Season 1 — 12 files, 8.4 GB, 1 failed"</i>).</li>
+    <li>Batch post-actions: extract all, join split archives, verify against a <code>SHA256SUMS</code> file, run a script, sleep or shut down.</li>
+    <li>Export the failed URLs, or the whole batch, as <code>.txt</code> or <code>.metalink</code>. Saved <b>batch templates</b> hold reusable settings.</li>
+  </ul>
+
+  <h3>5.5 Concurrency model</h3>
+  <p>Three nested limits: <b>global active jobs</b> ≥ <b>batch max parallel items</b> ≥ <b>connections per job</b>. On top of these sit per-host caps and three layers of token-bucket bandwidth limits (global → batch → job). The scheduler starts the highest-priority eligible job whenever a slot frees up.</p>
+</section>
+
+<!-- ============ QUEUE / CAPTURE / ORG ============ -->
+<section>
+  <h2><span class="num">6</span>Queues, scheduling &amp; limits</h2>
+  <ul>
+    <li><b>Multiple queues</b>, each with its own concurrency, speed limit and schedule. A default "Main" queue is created on first run.</li>
+    <li><b>Scheduler</b>: time windows (e.g. 02:00–07:00), weekday masks, and "stop when the window ends".</li>
+    <li><b>Profiles</b>: <i>Full speed</i>, <i>Balanced</i>, <i>Metered</i>. Switchable from the tray or header in one click.</li>
+    <li><b>Bandwidth limit</b>: global, per queue, per batch and per job. The limit can be changed live without restarting connections.</li>
+  </ul>
+
+  <section class="cont">
+  <h2><span class="num">7</span>Capture &amp; integration</h2>
+  <table>
+    <tr><th style="width:30%">Feature</th><th>Description</th><th style="width:10%">Phase</th></tr>
+    <tr><td>Add-URL dialog</td><td>Paste a URL. Filename, size and folder are prefilled after probing.</td><td><span class="pill v1">v1</span></td></tr>
+    <tr><td>Clipboard monitor</td><td>Offers to download when a URL is copied (opt-in, with an extension whitelist)</td><td><span class="pill v1">v1</span></td></tr>
+    <tr><td>Drag &amp; drop</td><td>Drop links, text files or <code>.metalink</code> onto the window</td><td><span class="pill v1">v1</span></td></tr>
+    <tr><td>Tray + notifications</td><td>Tray menu (pause all, profile, show) and freedesktop notifications</td><td><span class="pill v1">v1</span></td></tr>
+    <tr><td>CLI companion</td><td><code>adm add URL…</code>, <code>adm batch file.txt</code>, <code>adm ls</code>, <code>adm pause ID</code></td><td><span class="pill v2">v2</span></td></tr>
+    <tr><td>Browser extension</td><td>Chrome/Firefox capture of downloads and "download all links"</td><td><span class="pill v2">v2</span></td></tr>
+    <tr><td>MIME / scheme handler</td><td><code>magnet:</code>, <code>.torrent</code>, <code>.metalink</code> through <code>xdg-mime</code></td><td><span class="pill v2">v2</span></td></tr>
+  </table>
+  </section>
+
+  <section class="cont">
+  <h2><span class="num">8</span>Organization &amp; automation</h2>
+  <ul>
+    <li><b>Auto-categories</b>: Video, Music, Archives, Documents, Images, Programs, Other. Each has a default folder under <code>~/Downloads</code>.</li>
+    <li><b>Rules engine</b> <span class="pill v2">v2</span>: conditions (domain, extension, size, regex) → actions (folder, queue, connections, post-action).</li>
+    <li><b>Post-download actions</b>: open, reveal in folder, extract, run script, mark executable.</li>
+    <li><b>History</b> with full-text search, re-download, and duplicate warnings by URL or target path.</li>
+  </ul>
+  </section>
+</section>
+
+<!-- ============ UI ============ -->
+<section>
+  <h2><span class="num">9</span>UI / UX design</h2>
+  <p>Design principles: <b>calm by default, detailed on demand</b>. The main list stays readable at a glance. The details drawer shows everything else. Motion is used only to communicate change (progress, reordering, state transitions), and honors <i>prefers-reduced-motion</i>.</p>
+  <figure>
+    <svg viewBox="0 0 720 430" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Ubuntu Sans, sans-serif">
+      <rect x="0" y="0" width="720" height="430" rx="14" fill="#0b1020"/>
+      <!-- titlebar -->
+      <circle cx="20" cy="18" r="5" fill="#ef4444"/><circle cx="36" cy="18" r="5" fill="#f59e0b"/><circle cx="52" cy="18" r="5" fill="#10b981"/>
+      <!-- sidebar -->
+      <rect x="0" y="36" width="160" height="394" fill="#0f1629"/>
+      <rect x="14" y="50" width="26" height="26" rx="7" fill="url(#lg)"/>
+      <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+      <text x="48" y="68" font-size="13" font-weight="700" fill="#fff">ADM</text>
+      <g font-size="11" fill="#94a3b8">
+        <rect x="10" y="92" width="140" height="26" rx="7" fill="#1e2640"/>
+        <text x="22" y="109" fill="#e2e8f0">All downloads</text><text x="136" y="109" text-anchor="end" fill="#a5b4fc">24</text>
+        <text x="22" y="137">Active</text><text x="136" y="137" text-anchor="end">5</text>
+        <text x="22" y="161">Completed</text><text x="136" y="161" text-anchor="end">17</text>
+        <text x="22" y="185">Scheduled</text>
+        <text x="14" y="219" font-size="9" letter-spacing="1.5" fill="#475569">CATEGORIES</text>
+        <text x="22" y="241">Video</text><text x="22" y="263">Archives</text><text x="22" y="285">Documents</text><text x="22" y="307">Music</text>
+        <text x="14" y="341" font-size="9" letter-spacing="1.5" fill="#475569">BATCHES</text>
+        <text x="22" y="363">Season 1</text><text x="22" y="385">Wallpapers</text>
+      </g>
+      <!-- header -->
+      <rect x="176" y="48" width="280" height="30" rx="8" fill="#141b31" stroke="#232c47"/>
+      <text x="190" y="67" font-size="11" fill="#64748b">Search or paste a URL…          Ctrl K</text>
+      <rect x="580" y="48" width="124" height="30" rx="8" fill="#6366f1"/>
+      <text x="642" y="67" font-size="11.5" font-weight="700" fill="#fff" text-anchor="middle">+  New download</text>
+      <!-- speed graph -->
+      <path d="M470 76 L485 70 L500 72 L515 60 L530 64 L545 55 L560 58 L570 52" fill="none" stroke="#22d3ee" stroke-width="2"/>
+      <text x="470" y="56" font-size="10" fill="#94a3b8">↓ 38.2 MB/s</text>
+      <!-- cards -->
+      <g font-size="11">
+        <rect x="176" y="94" width="528" height="70" rx="11" fill="#141b31" stroke="#232c47"/>
+        <rect x="190" y="108" width="30" height="30" rx="8" fill="#312e81"/><text x="205" y="128" text-anchor="middle" fill="#a5b4fc" font-size="12">▶</text>
+        <text x="232" y="120" fill="#f1f5f9" font-weight="600" font-size="12">ubuntu-26.04-desktop-amd64.iso</text>
+        <text x="232" y="136" fill="#64748b">3.1 GB of 5.8 GB · 22.4 MB/s · 2 min left · 16 connections</text>
+        <text x="690" y="120" fill="#a5b4fc" text-anchor="end" font-weight="700">53%</text>
+        <g><rect x="190" y="148" width="500" height="6" rx="3" fill="#1e2640"/>
+          <rect x="190" y="148" width="60" height="6" rx="3" fill="#6366f1"/><rect x="252" y="148" width="40" height="6" rx="3" fill="#818cf8"/>
+          <rect x="315" y="148" width="55" height="6" rx="3" fill="#6366f1"/><rect x="378" y="148" width="30" height="6" rx="3" fill="#22d3ee"/>
+          <rect x="440" y="148" width="50" height="6" rx="3" fill="#818cf8"/><rect x="503" y="148" width="42" height="6" rx="3" fill="#22d3ee"/>
+          <rect x="566" y="148" width="36" height="6" rx="3" fill="#6366f1"/><rect x="628" y="148" width="28" height="6" rx="3" fill="#818cf8"/></g>
+
+        <rect x="176" y="174" width="528" height="112" rx="11" fill="#141b31" stroke="#6366f1"/>
+        <rect x="190" y="188" width="30" height="30" rx="8" fill="#164e63"/><text x="205" y="208" text-anchor="middle" fill="#67e8f9" font-size="12">▦</text>
+        <text x="232" y="200" fill="#f1f5f9" font-weight="600" font-size="12">Season 1</text>
+        <rect x="292" y="190" width="42" height="15" rx="7" fill="#1e3a5f"/><text x="313" y="201" text-anchor="middle" font-size="9" fill="#67e8f9">BATCH</text>
+        <text x="232" y="216" fill="#64748b">7 / 12 done · 1 failed · 15.8 MB/s · 6 min left</text>
+        <text x="690" y="200" fill="#67e8f9" text-anchor="end" font-weight="700">61%</text>
+        <rect x="190" y="226" width="500" height="6" rx="3" fill="#1e2640"/><rect x="190" y="226" width="305" height="6" rx="3" fill="#22d3ee"/>
+        <g fill="#94a3b8" font-size="10">
+          <text x="206" y="252">✓ S01E07.mkv</text><text x="340" y="252" fill="#64748b">1.2 GB</text>
+          <text x="206" y="270">↓ S01E08.mkv</text><rect x="340" y="264" width="120" height="4" rx="2" fill="#1e2640"/><rect x="340" y="264" width="70" height="4" rx="2" fill="#22d3ee"/>
+          <text x="480" y="252" fill="#ef4444">✕ S01E09.mkv — 403</text><text x="480" y="270" fill="#a5b4fc">Retry failed</text>
+        </g>
+
+        <rect x="176" y="296" width="528" height="58" rx="11" fill="#141b31" stroke="#232c47"/>
+        <rect x="190" y="310" width="30" height="30" rx="8" fill="#422006"/><text x="205" y="330" text-anchor="middle" fill="#fbbf24" font-size="12">❚❚</text>
+        <text x="232" y="322" fill="#f1f5f9" font-weight="600" font-size="12">dataset-2026.tar.zst</text>
+        <text x="232" y="338" fill="#64748b">Paused · 12.0 GB of 40.2 GB</text>
+
+        <rect x="176" y="364" width="528" height="52" rx="11" fill="#141b31" stroke="#232c47"/>
+        <rect x="190" y="375" width="30" height="30" rx="8" fill="#064e3b"/><text x="205" y="395" text-anchor="middle" fill="#34d399" font-size="12">✓</text>
+        <text x="232" y="388" fill="#f1f5f9" font-weight="600" font-size="12">report-final.pdf</text>
+        <text x="232" y="404" fill="#64748b">Completed · 4.2 MB · SHA-256 verified</text>
+      </g>
+    </svg>
+    <figcaption>Figure 2. Main window concept (dark theme). Multi-colored bars show each connection's segment.</figcaption>
+  </figure>
+
+  <h3>Key UI elements</h3>
+  <ul>
+    <li><b>Sidebar</b>: status filters, categories, queues and batches, each with live counts.</li>
+    <li><b>Header</b>: a combined search / quick-add box (<code>Ctrl K</code>), a global speed sparkline and the profile switcher.</li>
+    <li><b>Download card</b>: icon, name, meta line, percent, and a <b>per-segment progress bar</b>. Batch cards expand to show their items.</li>
+    <li><b>Details drawer</b>: overview, segments map, HTTP headers, event log, checksum, and "copy as curl".</li>
+    <li><b>Dialogs</b>: New download, New batch (with a Paste / Import / Pattern tabs), Settings.</li>
+    <li><b>Empty states</b> with drop-zone illustrations; <b>toasts</b> for non-blocking feedback.</li>
+    <li>Multi-select with <code>Shift</code>/<code>Ctrl</code>, a right-click context menu, and full keyboard navigation.</li>
+  </ul>
+</section>
+
+<section>
+  <h3 style="margin-top:0">Design tokens</h3>
+  <table>
+    <tr><th>Token</th><th>Dark</th><th>Light</th><th>Use</th></tr>
+    <tr><td>bg</td><td><span class="swatch" style="background:#0b1020"></span>#0B1020</td><td><span class="swatch" style="background:#f6f7fb"></span>#F6F7FB</td><td>App background</td></tr>
+    <tr><td>surface</td><td><span class="swatch" style="background:#141b31"></span>#141B31</td><td><span class="swatch" style="background:#ffffff"></span>#FFFFFF</td><td>Cards, dialogs</td></tr>
+    <tr><td>accent</td><td><span class="swatch" style="background:#6366f1"></span>#6366F1</td><td><span class="swatch" style="background:#4f46e5"></span>#4F46E5</td><td>Primary actions, active progress</td></tr>
+    <tr><td>accent-2</td><td><span class="swatch" style="background:#22d3ee"></span>#22D3EE</td><td><span class="swatch" style="background:#0891b2"></span>#0891B2</td><td>Batches, speed graph</td></tr>
+    <tr><td>success / warn / danger</td><td><span class="swatch" style="background:#34d399"></span><span class="swatch" style="background:#fbbf24"></span><span class="swatch" style="background:#f87171"></span></td><td><span class="swatch" style="background:#059669"></span><span class="swatch" style="background:#d97706"></span><span class="swatch" style="background:#dc2626"></span></td><td>Completed · Paused · Failed</td></tr>
+  </table>
+  <p>Typography: <b>Inter</b> (UI), falling back to Ubuntu Sans; <b>JetBrains Mono</b> for sizes, speeds and URLs (tabular numbers keep changing values from jittering). Radius: 8 / 12 / 16 px. Spacing on a 4 px grid. Motion: 150–250 ms ease-out, with springy reordering for list changes.</p>
+
+  <section class="cont">
+  <h2><span class="num">10</span>Data model</h2>
+  <pre><span class="k">CREATE TABLE</span> batches (
+  id <span class="k">TEXT PRIMARY KEY</span>, name <span class="k">TEXT</span>, order_mode <span class="k">TEXT</span>, max_parallel <span class="k">INT</span>,
+  on_failure <span class="k">TEXT</span>, rename_tpl <span class="k">TEXT</span>, dest_dir <span class="k">TEXT</span>, created_at <span class="k">INT</span>
+);
+<span class="k">CREATE TABLE</span> jobs (
+  id <span class="k">TEXT PRIMARY KEY</span>, batch_id <span class="k">TEXT REFERENCES</span> batches(id), queue <span class="k">TEXT</span>,
+  url <span class="k">TEXT</span>, final_url <span class="k">TEXT</span>, filename <span class="k">TEXT</span>, dir <span class="k">TEXT</span>, size <span class="k">INT</span>,
+  downloaded <span class="k">INT</span>, status <span class="k">TEXT</span>, error <span class="k">TEXT</span>, etag <span class="k">TEXT</span>, last_modified <span class="k">TEXT</span>,
+  resumable <span class="k">INT</span>, connections <span class="k">INT</span>, speed_limit <span class="k">INT</span>, priority <span class="k">INT</span>, position <span class="k">INT</span>,
+  headers_json <span class="k">TEXT</span>, checksum <span class="k">TEXT</span>, created_at <span class="k">INT</span>, completed_at <span class="k">INT</span>
+);
+<span class="k">CREATE TABLE</span> segments (
+  job_id <span class="k">TEXT REFERENCES</span> jobs(id) <span class="k">ON DELETE CASCADE</span>, idx <span class="k">INT</span>,
+  start <span class="k">INT</span>, "end" <span class="k">INT</span>, done <span class="k">INT</span>, <span class="k">PRIMARY KEY</span>(job_id, idx)
+);</pre>
+  </section>
+</section>
+
+<!-- ============ NFR / ROADMAP / RISKS ============ -->
+<section>
+  <h2><span class="num">11</span>Non-functional requirements</h2>
+  <table>
+    <tr><th style="width:28%">Area</th><th>Target</th></tr>
+    <tr><td>Throughput</td><td>Saturate a 1 Gbit/s link with 16 connections on a range-capable server</td></tr>
+    <tr><td>UI performance</td><td>Progress events are coalesced to ≤ 10 Hz per job. 500 rows scroll smoothly (virtualized list).</td></tr>
+    <tr><td>Resource use</td><td>Idle memory &lt; 80 MB. CPU &lt; 5% while downloading at 100 MB/s.</td></tr>
+    <tr><td>Durability</td><td><code>kill -9</code> at any moment loses at most ~1 s of progress and never corrupts data</td></tr>
+    <tr><td>Security</td><td>TLS verification on by default. Local API on a user-only socket (0600). No telemetry.</td></tr>
+    <tr><td>Accessibility</td><td>Full keyboard operation, visible focus rings, WCAG AA contrast in both themes</td></tr>
+    <tr><td>Testing</td><td>Engine unit tests against an <code>httptest</code> server that simulates ranges, drops, throttling and 5xx errors</td></tr>
+  </table>
+
+  <section class="cont">
+  <h2><span class="num">12</span>Roadmap</h2>
+  <table>
+    <tr><th style="width:18%">Milestone</th><th>Scope</th></tr>
+    <tr><td><b>M1 · Engine</b></td><td>Probe, dynamic segmentation, pause/resume, retry, rate limit, SQLite persistence, tests</td></tr>
+    <tr><td><b>M2 · Shell &amp; UI</b></td><td>Wails app, sidebar/list/cards, add dialog, per-segment bars, themes, details drawer</td></tr>
+    <tr><td><b>M3 · Batch</b></td><td>Paste/import/pattern, review dialog with probing, filters, rename templates, batch cards, retry-failed</td></tr>
+    <tr><td><b>M4 · Polish</b></td><td>Queues and scheduler, tray, notifications, clipboard monitor, settings, packaging (AppImage/.deb)</td></tr>
+    <tr><td><b>v2</b></td><td>CLI, browser extension, rules engine, page link grabber, FTP/SFTP, BitTorrent</td></tr>
+    <tr><td><b>v3</b></td><td>HLS/DASH, yt-dlp backend, LAN remote UI, plugins</td></tr>
+  </table>
+  </section>
+
+  <section class="cont">
+  <h2><span class="num">13</span>Risks &amp; open questions</h2>
+  <ul>
+    <li><b>WebKitGTK variance</b> across distributions: target 4.1, and test on Ubuntu, Fedora and Arch. Flatpak removes most of this variance.</li>
+    <li><b>Servers that lie</b> (wrong <code>Content-Length</code>, ranges ignored mid-stream): validate each response's <code>Content-Range</code>, and fall back to a single connection.</li>
+    <li><b>Aggressive multi-connection use</b> may trigger rate limits or bans. Defaults are sensible, and per-host caps are included.</li>
+    <li><b>Browser extension</b> packaging and store review take time. Deferred to v2.</li>
+    <li><i>Open:</i> the final product name, and whether to support a headless daemon mode for servers in v1.</li>
+  </ul>
+  </section>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Arrow + three segment bars, kept inside the 66dp adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M54,32V60M42,49L54,61L66,49"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path android:fillColor="#F2FFFFFF" android:pathData="M39.5,70h9a1.5,1.5 0,0 1,0 3h-9a1.5,1.5 0,0 1,0 -3z" />
+    <path android:fillColor="#B3FFFFFF" android:pathData="M49.5,70h9a1.5,1.5 0,0 1,0 3h-9a1.5,1.5 0,0 1,0 -3z" />
+    <path android:fillColor="#73FFFFFF" android:pathData="M59.5,70h9a1.5,1.5 0,0 1,0 3h-9a1.5,1.5 0,0 1,0 -3z" />
+</vector>
