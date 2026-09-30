@@ -30,6 +30,7 @@ object Engine : Listener {
         app = context.applicationContext
         val dataDir = File(app.filesDir, "engine")
         val u = Admmobile.start(dataDir.absolutePath, downloadDir().absolutePath)
+        NetworkMonitor.start(app)
         Admmobile.setListener(this)
         url = u
         return u
@@ -45,6 +46,10 @@ object Engine : Listener {
 
     override fun onProgress(active: Long, bytesPerSec: Long, downloaded: Long, total: Long) {
         main.post { DownloadService.instance?.showProgress(active, bytesPerSec, downloaded, total) }
+    }
+
+    override fun onMultiLinkChanged(enabled: Boolean) {
+        main.post { NetworkMonitor.setMultiLink(enabled) }
     }
 
     override fun onDownloadComplete(filename: String, path: String, inBatch: Boolean) {

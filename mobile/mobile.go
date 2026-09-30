@@ -11,6 +11,7 @@ import (
 	"crypto/rand"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -24,6 +25,7 @@ import (
 	"github.com/StrStark/advance-download-manager/internal/batch"
 	"github.com/StrStark/advance-download-manager/internal/core"
 	"github.com/StrStark/advance-download-manager/internal/httpapi"
+	"github.com/StrStark/advance-download-manager/internal/links"
 	"github.com/StrStark/advance-download-manager/internal/service"
 )
 
@@ -43,6 +45,9 @@ type Listener interface {
 	OnProgress(active int, bytesPerSec int64, downloaded int64, total int64)
 	// OnDownloadComplete fires for every finished file.
 	OnDownloadComplete(filename string, path string, inBatch bool)
+	// OnMultiLinkChanged tells the app whether to keep extra networks (e.g.
+	// mobile data next to Wi-Fi) connected for multi-link downloads.
+	OnMultiLinkChanged(enabled bool)
 }
 
 type engine struct {
@@ -141,7 +146,25 @@ func SetListener(l Listener) {
 		e.lastActive = -1 // force an initial OnActiveChanged
 		e.mu.Unlock()
 		e.notifyActive()
+		if l != nil {
+			l.OnMultiLinkChanged(e.m.Settings().MultiLink)
+		}
 	}
+}
+
+// SetLinks receives the device's networks from Android as JSON:
+// [{"id":"net-123","name":"wlan0","label":"Wi-Fi","kind":"wifi","handle":123,"addrs":["…"]}].
+// Go can't enumerate Android networks itself, and binds sockets by handle.
+func SetLinks(linksJSON string) error {
+	var ls []links.Link
+	if err := json.Unmarshal([]byte(linksJSON), &ls); err != nil {
+		return err
+	}
+	links.SetProvided(ls)
+	if e := current(); e != nil {
+		e.hub.Emit("links", ls)
+	}
+	return nil
 }
 
 // OpenURLs hands shared text (from the Android share sheet) to the UI. Links
@@ -269,6 +292,10 @@ func (x events) Emit(name string, data any) {
 	case core.EventDone:
 		if j, ok := data.(core.Job); ok {
 			l.OnDownloadComplete(j.Filename, j.Path(), j.BatchID != "")
+		}
+	case core.EventSettings:
+		if s, ok := data.(core.Settings); ok {
+			l.OnMultiLinkChanged(s.MultiLink)
 		}
 	}
 	if name == core.EventJob || name == core.EventProgress || name == core.EventRemoved {

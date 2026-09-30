@@ -1,7 +1,7 @@
 // A simulated engine so the UI can be developed and previewed in a normal
 // browser (`npm run dev`) without the Go backend.
 import type { Backend } from './api'
-import type { Batch, Job, Progress, ProbeResult, Segment, Settings, State } from './types'
+import type { Batch, Job, NetLink, PathStat, Progress, ProbeResult, ProxyProfile, Segment, Settings, State } from './types'
 import { expandPattern, extractURLs, filenameFromURL } from './batchutil'
 
 const MB = 1024 * 1024
@@ -57,7 +57,24 @@ export function createMockBackend(): Backend {
     categorizeByType: false,
     clipboardWatch: false,
     notifyOnComplete: true,
+    proxies: [
+      { id: 'px-de', name: 'Germany · Reality', type: 'vless', url: 'vless://…', server: 'de1.example.net:443', subscriptionId: 'sub-1' },
+      { id: 'px-nl', name: 'Netherlands · WS', type: 'vmess', url: 'vmess://…', server: 'nl2.example.net:443', subscriptionId: 'sub-1' },
+      { id: 'px-fi', name: 'Finland · Trojan', type: 'trojan', url: 'trojan://…', server: 'fi.example.net:443', subscriptionId: 'sub-1' },
+      { id: 'px-home', name: 'Home SOCKS', type: 'socks5', url: 'socks5://127.0.0.1:10808', server: '127.0.0.1:10808' },
+    ],
+    subscriptions: [{ id: 'sub-1', name: 'My provider', url: 'https://sub.example.com/abc', updatedAt: Date.now() - 3 * 3600e3 }],
+    defaultProxy: '',
+    proxyBypass: ['localhost', '<local>'],
+    multiLink: true,
+    links: [],
   }
+  const netLinks: Omit<NetLink, 'enabled'>[] = [
+    { id: 'eno1', name: 'eno1', label: 'Ethernet (eno1)', kind: 'ethernet', addrs: ['192.168.1.20'] },
+    { id: 'wlan0', name: 'wlan0', label: 'Wi-Fi (wlan0)', kind: 'wifi', addrs: ['172.20.10.3'] },
+  ]
+  const linkEnabled = (id: string) => (settings.links?.length ? settings.links.includes(id) : true)
+  const activeLinks = () => (settings.multiLink ? netLinks.filter((l) => linkEnabled(l.id)) : [])
   const jobs: Job[] = []
   const batches: Batch[] = []
   const speed = new Map<string, number>()
@@ -215,7 +232,14 @@ export function createMockBackend(): Backend {
         }
       }
       j.downloaded = segs.reduce((a, x) => a + x.done, 0)
-      prog.push({ id: j.id, status: j.status, downloaded: j.downloaded, size: j.size, speed: s, segments: segs, conns: Math.min(j.connections, segs.filter((x) => x.done < x.end - x.start + 1).length) })
+      const nets = activeLinks()
+      let paths: PathStat[] | undefined
+      if (nets.length > 1) {
+        const share = [0.68, 0.32]
+        segs.forEach((x, i) => (x.path = nets[i % nets.length].id))
+        paths = nets.map((l, i) => ({ id: l.id, label: l.label, kind: l.kind, speed: s * (share[i] ?? 0.2), conns: Math.ceil(j.connections / nets.length) }))
+      }
+      prog.push({ id: j.id, status: j.status, downloaded: j.downloaded, size: j.size, speed: s, segments: segs, paths, conns: Math.min(j.connections, segs.filter((x) => x.done < x.end - x.start + 1).length) })
       if (j.downloaded >= j.size) {
         j.downloaded = j.size
         j.status = 'completed'
@@ -361,6 +385,48 @@ export function createMockBackend(): Backend {
     },
     async pendingURLs() {
       return []
+    },
+    async listLinks() {
+      return netLinks.map((l) => ({ ...l, enabled: linkEnabled(l.id) }))
+    },
+    async checkLinks() {
+      await wait(700)
+      return { eno1: { latencyMs: 18 }, wlan0: { latencyMs: 64 } }
+    },
+    async parseProxies(text) {
+      const profiles: ProxyProfile[] = []
+      const errors: string[] = []
+      for (const line of text.split(/\s+/).filter((l) => l.includes('://'))) {
+        const m = /^(vmess|vless|trojan|ss|socks5|socks|http|https):\/\/(?:[^@]*@)?([^/?#]+)/i.exec(line)
+        if (!m) {
+          errors.push(line.slice(0, 40) + ': unsupported link')
+          continue
+        }
+        const type = ({ ss: 'shadowsocks', socks: 'socks5' } as Record<string, string>)[m[1].toLowerCase()] ?? m[1].toLowerCase()
+        const name = decodeURIComponent(line.split('#')[1] ?? '') || `${type} ${m[2]}`
+        profiles.push({ id: id(), name, type: type as ProxyProfile['type'], url: line, server: m[2] })
+      }
+      return { profiles, errors }
+    },
+    async fetchSubscription(url) {
+      await wait(900)
+      if (!/^https?:\/\//.test(url)) throw new Error('invalid URL')
+      return {
+        profiles: [
+          { id: id(), name: 'Germany · Reality', type: 'vless', url: 'vless://…', server: 'de1.example.net:443' },
+          { id: id(), name: 'Netherlands · WS', type: 'vmess', url: 'vmess://…', server: 'nl2.example.net:443' },
+          { id: id(), name: 'Finland · Trojan', type: 'trojan', url: 'trojan://…', server: 'fi.example.net:443' },
+        ],
+        errors: [],
+      }
+    },
+    async testProxy(p) {
+      await wait(400 + Math.random() * 800)
+      if (p.name.includes('Finland')) return { ok: false, latencyMs: 0, error: 'timed out' }
+      return { ok: true, latencyMs: 80 + (hash(p.id) % 300), ip: `185.${hash(p.id) % 255}.12.7` }
+    },
+    async xrayAvailable() {
+      return true
     },
     on(ev, cb) {
       if (!listeners.has(ev)) listeners.set(ev, new Set())

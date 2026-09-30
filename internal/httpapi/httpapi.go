@@ -158,7 +158,8 @@ func dispatch(cfg Config, s *service.Service, method string, a []json.RawMessage
 			return nil, err
 		}
 		h, _ := arg[map[string]string](a, 1)
-		return s.Probe(u, h), nil
+		via, _ := arg[string](a, 2)
+		return s.Probe(u, h, via), nil
 	case "ProbeMany":
 		session, err := arg[string](a, 0)
 		if err != nil {
@@ -168,7 +169,8 @@ func dispatch(cfg Config, s *service.Service, method string, a []json.RawMessage
 		if err != nil {
 			return nil, err
 		}
-		s.ProbeMany(session, urls)
+		via, _ := arg[string](a, 2)
+		s.ProbeMany(session, urls, via)
 		return nil, nil
 	case "ExtractURLs":
 		t, err := arg[string](a, 0)
@@ -255,6 +257,28 @@ func dispatch(cfg Config, s *service.Service, method string, a []json.RawMessage
 		bps, err := arg[int64](a, 0)
 		s.SetSpeedLimit(bps)
 		return nil, err
+	case "ListLinks":
+		return s.ListLinks(), nil
+	case "CheckLinks":
+		return s.CheckLinks(), nil
+	case "XrayAvailable":
+		return s.XrayAvailable(), nil
+	case "ParseProxies":
+		t, err := arg[string](a, 0)
+		return s.ParseProxies(t), err
+	case "FetchSubscription":
+		u, err := arg[string](a, 0)
+		if err != nil {
+			return nil, err
+		}
+		via, _ := arg[string](a, 1)
+		return s.FetchSubscription(u, via)
+	case "TestProxy":
+		p, err := arg[core.ProxyProfile](a, 0)
+		if err != nil {
+			return nil, err
+		}
+		return s.TestProxy(p), nil
 	case "UpdateSettings":
 		st, err := arg[core.Settings](a, 0)
 		if err != nil {

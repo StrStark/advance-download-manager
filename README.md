@@ -33,6 +33,8 @@ NAS.
 - ⚡ **Fast:** up to 32 connections per file, with work-stealing so no connection sits idle at the end
 - 🛡️ **Resilient:** pause, crash, reboot or lose Wi-Fi and ADM picks up where it stopped
 - 📦 **Batch-native:** paste a wall of text, a URL pattern or a file of links; review, rename and go
+- 🔀 **Combine connections:** Ethernet + a phone hotspot, or Wi-Fi + mobile data, working together on one download
+- 🛰️ **Proxies built in:** HTTP, SOCKS5 and V2Ray/Xray (VLESS, VMess, Trojan, Shadowsocks, REALITY) with subscriptions
 - ✨ **Actually nice to use:** live segment map, speed graph, dark and light themes, keyboard-first
 - 🌍 **Everywhere:** native desktop apps, an Android app, and a Docker image with a web UI
 
@@ -92,6 +94,28 @@ NAS.
 
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🔀 Combine connections
+- Split one download across **several network connections at once**: Ethernet + a phone hotspot, two ISPs, or Wi-Fi + mobile data on Android
+- Each connection is pinned at the socket level (`SO_BINDTODEVICE` on Linux, `IP_UNICAST_IF` on Windows, `IP_BOUND_IF` on macOS, network handles on Android)
+- Work stealing sends more of the file down the faster link automatically
+- A link that can't reach the server, or a CDN that locks links to one IP, is dropped for that file; the rest carry on
+- Live per-connection speed, and segment bars colored by connection
+
+</td>
+<td width="50%" valign="top">
+
+### 🛰️ Proxies & V2Ray
+- **HTTP, HTTPS, SOCKS5** proxies, plus a built-in **Xray-core** for **VLESS, VMess, Trojan, Shadowsocks (incl. 2022)** over TCP, WebSocket, gRPC, HTTPUpgrade and XHTTP, with TLS and **REALITY**
+- Paste share links (`vless://`, `vmess://`, `trojan://`, `ss://`) or add a **subscription URL**
+- **Test** any server: latency and exit IP
+- Pick the proxy **per download or per batch**, with a global default and bypass rules (`<local>`, domains, CIDRs)
+- Works together with multi-link: each connection reaches the proxy through its own interface
+
+</td>
+</tr>
 </table>
 
 <div align="center">
@@ -103,6 +127,15 @@ NAS.
 <tr>
 <td align="center"><sub>Batch review: 12 URLs from one pattern, numbered by a rename template</sub></td>
 <td align="center"><sub>Android / phone layout</sub></td>
+</tr>
+<tr>
+<td colspan="2">
+<img src="docs/screenshots/network-connections.png" width="49%" alt="Network panel: combine connections" />
+<img src="docs/screenshots/network-proxies.png" width="49%" alt="Network panel: proxies and subscriptions" />
+</td>
+</tr>
+<tr>
+<td colspan="2" align="center"><sub>Network panel: combine Ethernet + a phone hotspot, and V2Ray servers from a subscription</sub></td>
 </tr>
 <tr>
 <td colspan="2"><img src="docs/screenshots/desktop-light.png" alt="Light theme" /></td>
@@ -159,7 +192,10 @@ docker run -d --name adm --restart unless-stopped -p 8080:8080 \
 | `ADM_DATA_DIR` | `/data` | History and settings |
 | `ADM_DOWNLOAD_ROOT` | `/downloads` | Every download folder must be inside it; relative paths resolve under it |
 
-The image is about 18 MB (distroless, static Go binary), runs as non-root, has a healthcheck, and
+To **combine several network connections** from a container, give it the host's network
+(`network_mode: host` in compose, or `--network host`), so it can see the real interfaces.
+
+The image is small (distroless, static Go binary), runs as non-root, has a healthcheck, and
 builds for `amd64` and `arm64` (Raspberry Pi, Synology and similar). In the browser UI, finished files
 can be saved to the viewing device and link lists are imported by upload.
 
@@ -198,6 +234,10 @@ flowchart LR
   is no merge step.
 - **Work stealing.** When a connection finishes its range, it takes the largest remaining segment and
   splits it in half. Slow tails get parallelized automatically.
+- **Routes.** Every download gets one or more *routes*: a network link plus an optional proxy
+  (`internal/netpath`). Connections are spread across routes and bytes are counted per route. A route
+  that fails is dropped for that file without failing it. Proxies run through Go's HTTP client (HTTP,
+  SOCKS5) or an embedded Xray-core instance per route (`internal/proxy`).
 - **Three shells, one UI.** The desktop app calls Go through Wails bindings. The server and the Android
   app expose the same methods over a small JSON RPC API plus server-sent events. The UI detects which
   backend it's talking to and adapts (native folder picker or text path, *Open* or *Save to this
@@ -213,6 +253,9 @@ The full design is in the [**specification (PDF)**](docs/ADM-Specification.pdf).
 
 **Requirements:** Go 1.27+, Node 20+, and for the desktop app [Wails v2](https://wails.io)
 (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`).
+
+Xray-core is built in by default, which adds about 25 MB. Build with `-tags noxray` for a small binary
+that supports only HTTP and SOCKS5 proxies.
 
 ### Linux
 
@@ -306,6 +349,9 @@ internal/batch/        link extraction, URL patterns, list import, rename templa
 internal/service/      API shared by every shell
 internal/httpapi/      HTTP RPC + server-sent events (server and Android)
 internal/platform/     per-OS: open/reveal files, notifications, disk space, data dir
+internal/links/        network interfaces + per-OS socket pinning (multi-link)
+internal/proxy/        HTTP/SOCKS5 + embedded Xray-core, share links, subscriptions
+internal/netpath/      picks routes (links × proxy) for each download
 mobile/                Android engine (gomobile bind)
 android/               Kotlin app: WebView, foreground service, share target
 frontend/              Svelte 5 + TypeScript + Tailwind CSS v4
@@ -323,6 +369,8 @@ Data lives in `~/.local/share/adm` (Linux), `~/Library/Application Support/ADM` 
 - [x] Segmented engine with work stealing, resume, retries and speed limit
 - [x] Batch downloads: paste, patterns, import, probe, filter, rename templates
 - [x] Desktop apps (Linux / Windows / macOS), Android app, Docker server
+- [x] Proxies: HTTP, SOCKS5, V2Ray/Xray (VLESS, VMess, Trojan, Shadowsocks, REALITY), subscriptions
+- [x] Combine network connections (multi-link), including Wi-Fi + mobile data on Android
 - [ ] Browser extension (Chrome / Firefox) to capture downloads
 - [ ] Queues with schedules (e.g. download 02:00–07:00) and per-host limits in the UI
 - [ ] System tray and a `adm` command-line client

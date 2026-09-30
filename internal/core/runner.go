@@ -42,6 +42,10 @@ type runner struct {
 	conns      atomic.Int32
 	firstErr   error
 	errOnce    sync.Once
+
+	routes    *routeSet
+	routesPtr atomic.Pointer[routeSet] // for the progress ticker
+	wg        sync.WaitGroup
 }
 
 func newRunner(m *Manager, id string) *runner {
@@ -76,8 +80,15 @@ func (r *runner) download() error {
 	// needs to dodge existing files.
 	ranBefore := job.Probed
 
+	routes, err := r.m.routesFor(job)
+	if err != nil {
+		return err
+	}
+	r.routes = newRouteSet(routes)
+	r.routesPtr.Store(r.routes)
+
 	// Probe (always on start: also validates that a resume is still safe).
-	pr, err := Probe(r.ctx, r.m.client, job.URL, job.Headers)
+	pr, err := r.probeAny(job)
 	if err != nil {
 		return err
 	}
@@ -150,29 +161,20 @@ func (r *runner) segmented(f *os.File, job *Job, fresh bool) error {
 	r.mu.Unlock()
 	r.downloaded.Store(done)
 
-	workers := max(job.Connections, 1)
-	var wg sync.WaitGroup
+	// Each route (network link / proxy) gets the job's connection count.
+	workers := min(max(job.Connections, 1)*len(r.routes.alive()), 32)
 	for range workers {
-		seg := r.take()
+		rt := r.routes.pick()
+		if rt == nil {
+			break
+		}
+		seg := r.take(rt)
 		if seg == nil {
 			break
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			r.conns.Add(1)
-			defer r.conns.Add(-1)
-			for seg != nil {
-				if err := r.fetchRange(f, job, seg); err != nil {
-					r.fail(err)
-					return
-				}
-				r.release(seg)
-				seg = r.take()
-			}
-		}()
+		r.startWorker(f, job, seg, rt)
 	}
-	wg.Wait()
+	r.wg.Wait()
 	if r.firstErr != nil {
 		return r.firstErr
 	}
@@ -208,14 +210,53 @@ func splitInitial(size int64, conns int) []Segment {
 	return segs
 }
 
+// startWorker runs one connection: it downloads seg, then keeps taking
+// work until none is left. If its route fails while other routes are alive,
+// the route is dropped for this download and its work moves elsewhere.
+func (r *runner) startWorker(f *os.File, job *Job, seg *Segment, rt *routeState) {
+	r.wg.Add(1)
+	go func() {
+		defer r.wg.Done()
+		r.conns.Add(1)
+		rt.conns.Add(1)
+		defer func() {
+			r.conns.Add(-1)
+			rt.conns.Add(-1)
+		}()
+		for seg != nil {
+			if err := r.fetchRange(f, job, seg, rt); err != nil {
+				if r.ctx.Err() == nil && shouldDropRoute(err) && r.routes.drop(rt) {
+					r.release(seg)
+					// Keep the connection count up on the remaining routes.
+					if next := r.routes.pick(); next != nil {
+						if s := r.take(next); s != nil {
+							r.startWorker(f, job, s, next)
+						}
+					}
+					return
+				}
+				r.fail(err)
+				return
+			}
+			r.release(seg)
+			seg = r.take(rt)
+		}
+	}()
+}
+
 // take returns an unowned incomplete segment, or splits the largest active
 // one in half and returns the new tail. nil means there is nothing left.
-func (r *runner) take() *Segment {
+func (r *runner) take(rt *routeState) *Segment {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	path := ""
+	if rt != nil && r.routes != nil && r.routes.multi() {
+		path = rt.ID
+	}
 	for _, s := range r.segs {
 		if !r.owned[s] && s.Remaining() > 0 {
 			r.owned[s] = true
+			s.Path = path
 			return s
 		}
 	}
@@ -230,7 +271,7 @@ func (r *runner) take() *Segment {
 	}
 	pos := best.Start + best.Done
 	mid := pos + best.Remaining()/2
-	tail := &Segment{Start: mid, End: best.End}
+	tail := &Segment{Start: mid, End: best.End, Path: path}
 	best.End = mid - 1
 	r.segs = append(r.segs, tail)
 	r.owned[tail] = true
@@ -251,7 +292,7 @@ func (r *runner) fail(err error) {
 }
 
 // fetchRange downloads the remaining bytes of seg, retrying transient errors.
-func (r *runner) fetchRange(f *os.File, job *Job, seg *Segment) error {
+func (r *runner) fetchRange(f *os.File, job *Job, seg *Segment, rt *routeState) error {
 	maxRetries := r.m.settingsCopy().MaxRetries
 	for attempt := 0; ; attempt++ {
 		r.mu.Lock()
@@ -260,7 +301,7 @@ func (r *runner) fetchRange(f *os.File, job *Job, seg *Segment) error {
 		if from > end {
 			return nil
 		}
-		err := r.fetchOnce(f, job, seg, from, end)
+		err := r.fetchOnce(f, job, seg, rt, from, end)
 		if err == nil {
 			return nil
 		}
@@ -276,7 +317,7 @@ func (r *runner) fetchRange(f *os.File, job *Job, seg *Segment) error {
 	}
 }
 
-func (r *runner) fetchOnce(f *os.File, job *Job, seg *Segment, from, end int64) error {
+func (r *runner) fetchOnce(f *os.File, job *Job, seg *Segment, rt *routeState, from, end int64) error {
 	url := job.FinalURL
 	if url == "" {
 		url = job.URL
@@ -290,7 +331,7 @@ func (r *runner) fetchOnce(f *os.File, job *Job, seg *Segment, from, end int64) 
 	if job.ETag != "" {
 		req.Header.Set("If-Range", job.ETag)
 	}
-	resp, err := r.m.client.Do(req)
+	resp, err := rt.Client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -304,12 +345,12 @@ func (r *runner) fetchOnce(f *os.File, job *Job, seg *Segment, from, end int64) 
 	if start := contentRangeStart(resp.Header.Get("Content-Range")); start != from {
 		return errRangeIgnored
 	}
-	return r.copyInto(f, resp.Body, seg)
+	return r.copyInto(f, resp.Body, seg, rt)
 }
 
 // copyInto writes body at the segment's cursor until the segment's (possibly
 // shrinking) end is reached.
-func (r *runner) copyInto(f *os.File, body io.Reader, seg *Segment) error {
+func (r *runner) copyInto(f *os.File, body io.Reader, seg *Segment, rt *routeState) error {
 	buf := make([]byte, chunkSize)
 	for {
 		n, rerr := body.Read(buf)
@@ -331,6 +372,7 @@ func (r *runner) copyInto(f *os.File, body io.Reader, seg *Segment) error {
 				finished := seg.Remaining() <= 0
 				r.mu.Unlock()
 				r.downloaded.Add(allowed)
+				rt.bytes.Add(allowed)
 				if finished {
 					return nil
 				}
@@ -356,11 +398,19 @@ func (r *runner) copyInto(f *os.File, body io.Reader, seg *Segment) error {
 // stream downloads over a single connection for servers without range
 // support or unknown sizes. It always restarts from zero.
 func (r *runner) stream(f *os.File, job *Job) error {
+	rt := r.routes.pick()
+	if rt == nil {
+		return errors.New("no working network route")
+	}
 	r.conns.Store(1)
-	defer r.conns.Store(0)
+	rt.conns.Store(1)
+	defer func() {
+		r.conns.Store(0)
+		rt.conns.Store(0)
+	}()
 	maxRetries := r.m.settingsCopy().MaxRetries
 	for attempt := 0; ; attempt++ {
-		err := r.streamOnce(f, job)
+		err := r.streamOnce(f, job, rt)
 		if err == nil || r.ctx.Err() != nil || attempt >= maxRetries || !retryable(err) {
 			if r.ctx.Err() != nil {
 				return r.ctx.Err()
@@ -373,7 +423,7 @@ func (r *runner) stream(f *os.File, job *Job) error {
 	}
 }
 
-func (r *runner) streamOnce(f *os.File, job *Job) error {
+func (r *runner) streamOnce(f *os.File, job *Job, rt *routeState) error {
 	if err := f.Truncate(0); err != nil {
 		return err
 	}
@@ -391,7 +441,7 @@ func (r *runner) streamOnce(f *os.File, job *Job) error {
 		return err
 	}
 	applyHeaders(req, job.Headers)
-	resp, err := r.m.client.Do(req)
+	resp, err := rt.Client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -399,7 +449,7 @@ func (r *runner) streamOnce(f *os.File, job *Job) error {
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return &httpError{code: resp.StatusCode, status: resp.Status, retryAfter: resp.Header.Get("Retry-After")}
 	}
-	err = r.copyInto(f, resp.Body, seg)
+	err = r.copyInto(f, resp.Body, seg, rt)
 	if err == io.ErrUnexpectedEOF && job.Size <= 0 {
 		err = nil // unknown length: EOF is the end
 	}

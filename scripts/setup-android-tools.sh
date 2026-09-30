@@ -49,7 +49,6 @@ export PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH"
 go install golang.org/x/mobile/cmd/gomobile@latest
 go install golang.org/x/mobile/cmd/gobind@latest
 cd "$(dirname "$0")/.."
-go get golang.org/x/mobile/bind@latest
 ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" gomobile init
 
 cat > "$HOME/.adm-android-env" <<ENV

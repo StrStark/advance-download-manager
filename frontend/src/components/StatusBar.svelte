@@ -52,6 +52,22 @@
     <span class="num text-fg-2">{speed(store.totalSpeed)}</span>
   </span>
 
+  <button
+    class="flex h-6 min-w-0 items-center gap-1.5 rounded-md px-1.5 transition-colors hover:bg-surface-2 hover:text-fg"
+    onclick={() => (store.networkOpen = true)}
+    title="Network: connections and proxy"
+  >
+    {#if store.activeLinks.length >= 2}
+      <Icon name="merge" size={13} class="text-accent-2" />
+      <span class="num">{store.activeLinks.length}</span>
+    {:else}
+      <Icon name="globe" size={13} />
+    {/if}
+    {#if store.proxyName('') !== 'Direct'}
+      <span class="hidden max-w-[140px] truncate sm:inline">{store.proxyName('')}</span>
+    {/if}
+  </button>
+
   <div class="relative">
     <button
       class="flex h-6 items-center gap-1.5 rounded-md px-1.5 transition-colors hover:bg-surface-2 hover:text-fg {store.settings.speedLimit

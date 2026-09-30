@@ -23,6 +23,9 @@ type Segment struct {
 	Start int64 `json:"start"`
 	End   int64 `json:"end"`
 	Done  int64 `json:"done"`
+	// Path is the connection route (network link / proxy) currently or last
+	// used for this segment; empty for the default route.
+	Path string `json:"path,omitempty"`
 }
 
 func (s Segment) Remaining() int64 { return s.End - s.Start + 1 - s.Done }
@@ -49,10 +52,12 @@ type Job struct {
 	Connections  int               `json:"connections"`
 	Segments     []Segment         `json:"segments"`
 	Headers      map[string]string `json:"headers,omitempty"`
-	Position     int               `json:"position"`
-	Retries      int               `json:"retries"`
-	CreatedAt    int64             `json:"createdAt"`
-	CompletedAt  int64             `json:"completedAt,omitempty"`
+	// Proxy is "" (use the default), "direct", "system", or a profile ID.
+	Proxy       string `json:"proxy,omitempty"`
+	Position    int    `json:"position"`
+	Retries     int    `json:"retries"`
+	CreatedAt   int64  `json:"createdAt"`
+	CompletedAt int64  `json:"completedAt,omitempty"`
 }
 
 // Path returns the final destination path.
@@ -84,17 +89,60 @@ type Settings struct {
 	CategorizeByType   bool   `json:"categorizeByType"`
 	ClipboardWatch     bool   `json:"clipboardWatch"`
 	NotifyOnComplete   bool   `json:"notifyOnComplete"`
+
+	// Proxies. DefaultProxy is "" (direct), "system" (environment), or a
+	// profile ID. ProxyBypass lists hosts that always go direct.
+	Proxies       []ProxyProfile `json:"proxies"`
+	Subscriptions []Subscription `json:"subscriptions"`
+	DefaultProxy  string         `json:"defaultProxy"`
+	ProxyBypass   []string       `json:"proxyBypass"`
+
+	// MultiLink spreads each download over several network connections
+	// (e.g. Ethernet + a phone hotspot). Links limits it to these link IDs;
+	// empty means every connected link.
+	MultiLink bool     `json:"multiLink"`
+	Links     []string `json:"links"`
+}
+
+// ProxyProfile is one proxy server. URL is either a proxy URL
+// (http://, https://, socks5://) or a V2Ray/Xray share link
+// (vmess://, vless://, trojan://, ss://).
+type ProxyProfile struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"` // http | https | socks5 | vmess | vless | trojan | shadowsocks
+	URL            string `json:"url"`
+	Server         string `json:"server,omitempty"` // host:port, for display
+	SubscriptionID string `json:"subscriptionId,omitempty"`
+}
+
+// Subscription is a URL that serves a list of share links.
+type Subscription struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	URL       string `json:"url"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+// PathStat is live per-route throughput for one download.
+type PathStat struct {
+	ID    string  `json:"id"`
+	Label string  `json:"label"`
+	Kind  string  `json:"kind"`
+	Speed float64 `json:"speed"`
+	Conns int     `json:"conns"`
 }
 
 // Progress is the light-weight, high-frequency update sent to the UI.
 type Progress struct {
-	ID         string    `json:"id"`
-	Status     Status    `json:"status"`
-	Downloaded int64     `json:"downloaded"`
-	Size       int64     `json:"size"`
-	Speed      float64   `json:"speed"` // bytes/s, smoothed
-	Segments   []Segment `json:"segments"`
-	Conns      int       `json:"conns"` // live connections
+	ID         string     `json:"id"`
+	Status     Status     `json:"status"`
+	Downloaded int64      `json:"downloaded"`
+	Size       int64      `json:"size"`
+	Speed      float64    `json:"speed"` // bytes/s, smoothed
+	Segments   []Segment  `json:"segments"`
+	Conns      int        `json:"conns"` // live connections
+	Paths      []PathStat `json:"paths,omitempty"`
 }
 
 // Emitter delivers engine events to whatever frontend is attached.

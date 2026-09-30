@@ -44,6 +44,7 @@ type AddRequest struct {
 	Connections int               `json:"connections"`
 	Headers     map[string]string `json:"headers"`
 	Paused      bool              `json:"paused"`
+	Proxy       string            `json:"proxy"`
 	// Hints from a previous probe so the list looks right immediately.
 	Size int64 `json:"size"`
 }
@@ -56,6 +57,7 @@ type BatchRequest struct {
 	Sequential  bool         `json:"sequential"`
 	Connections int          `json:"connections"`
 	Paused      bool         `json:"paused"`
+	Proxy       string       `json:"proxy"`
 	Items       []AddRequest `json:"items"`
 }
 
@@ -78,6 +80,7 @@ type Manager struct {
 	closing  bool
 
 	client  *http.Client
+	router  Router
 	limiter *Limiter
 	store   *Store
 	emit    Emitter
@@ -96,6 +99,7 @@ func DefaultSettings() Settings {
 		DefaultConnections: 8,
 		MaxRetries:         6,
 		PerHostLimit:       16,
+		ProxyBypass:        []string{"localhost", "<local>"},
 		Theme:              "system",
 		CategorizeByType:   false,
 		NotifyOnComplete:   true,
@@ -350,6 +354,9 @@ func (m *Manager) AddBatch(req BatchRequest) (Batch, error) {
 			it.Connections = req.Connections
 		}
 		it.Paused = it.Paused || req.Paused
+		if it.Proxy == "" {
+			it.Proxy = req.Proxy
+		}
 		j, err := m.newJobLocked(it, b.ID)
 		if err != nil {
 			continue // skip invalid entries rather than failing the whole batch
@@ -405,6 +412,7 @@ func (m *Manager) newJobLocked(req AddRequest, batchID string) (*Job, error) {
 		Status:      StatusQueued,
 		Connections: conns,
 		Headers:     req.Headers,
+		Proxy:       req.Proxy,
 		Position:    m.nextPositionLocked(),
 		CreatedAt:   now(),
 	}
@@ -800,16 +808,23 @@ func (m *Manager) tickProgress() {
 			}
 		}
 		sp.last, sp.at = d, t
-		out = append(out, Progress{
+		p := Progress{
 			ID: id, Status: j.Status, Downloaded: d, Size: j.Size,
 			Speed: sp.speed, Segments: r.segments(), Conns: int(r.conns.Load()),
-		})
+		}
+		if rs := r.routesPtr.Load(); rs != nil && rs.multi() {
+			p.Paths = rs.stats(t)
+		}
+		out = append(out, p)
 	}
 	m.mu.Unlock()
 	m.emit.Emit(EventProgress, out)
 }
 
 // ---------- helpers ----------
+
+// NewID returns a random identifier for jobs, batches and profiles.
+func NewID() string { return newID() }
 
 func newID() string {
 	var b [8]byte

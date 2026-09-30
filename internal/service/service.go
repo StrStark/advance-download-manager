@@ -12,7 +12,10 @@ import (
 
 	"github.com/StrStark/advance-download-manager/internal/batch"
 	"github.com/StrStark/advance-download-manager/internal/core"
+	"github.com/StrStark/advance-download-manager/internal/links"
+	"github.com/StrStark/advance-download-manager/internal/netpath"
 	"github.com/StrStark/advance-download-manager/internal/platform"
+	"github.com/StrStark/advance-download-manager/internal/proxy"
 )
 
 // Event names emitted by the service itself (the engine's are in core).
@@ -24,13 +27,16 @@ const (
 
 // Service wraps a Manager with UI-facing operations.
 type Service struct {
-	M    *core.Manager
-	ctx  context.Context
-	emit func(name string, data any)
+	M      *core.Manager
+	router *netpath.Router
+	ctx    context.Context
+	emit   func(name string, data any)
 }
 
 func New(m *core.Manager) *Service {
-	return &Service{M: m, ctx: context.Background(), emit: func(string, any) {}}
+	r := netpath.New(m.Settings)
+	m.SetRouter(r)
+	return &Service{M: m, router: r, ctx: context.Background(), emit: func(string, any) {}}
 }
 
 // Attach connects the service to a running UI and starts the engine.
@@ -44,10 +50,18 @@ func (s *Service) Emit(name string, data any) { s.emit(name, data) }
 
 func (s *Service) GetState() core.State { return s.M.Snapshot() }
 
-func (s *Service) Probe(rawURL string, headers map[string]string) core.ProbeResult {
+// Probe checks a URL through the given proxy choice ("" = default).
+func (s *Service) Probe(rawURL string, headers map[string]string, proxyChoice string) core.ProbeResult {
 	ctx, cancel := context.WithTimeout(s.ctx, 20*time.Second)
 	defer cancel()
-	r, err := core.Probe(ctx, s.M.Client(), strings.TrimSpace(rawURL), headers)
+	rawURL = strings.TrimSpace(rawURL)
+	c := s.M.Client()
+	if rs, err := s.router.Routes(rawURL, proxyChoice); err == nil && len(rs) > 0 {
+		c = rs[0].Client
+	} else if err != nil {
+		return core.ProbeResult{URL: rawURL, Size: -1, Error: err.Error()}
+	}
+	r, err := core.Probe(ctx, c, rawURL, headers)
 	if err != nil {
 		r.Error = err.Error()
 	}
@@ -62,7 +76,7 @@ type probeEvent struct {
 
 // ProbeMany checks URLs with a small worker pool and streams each result as
 // a "probe:result" event.
-func (s *Service) ProbeMany(session string, urls []string) {
+func (s *Service) ProbeMany(session string, urls []string, proxyChoice string) {
 	go func() {
 		jobs := make(chan int)
 		var wg sync.WaitGroup
@@ -71,7 +85,7 @@ func (s *Service) ProbeMany(session string, urls []string) {
 			go func() {
 				defer wg.Done()
 				for i := range jobs {
-					s.emit(EventProbeResult, probeEvent{Session: session, Index: i, Result: s.Probe(urls[i], nil)})
+					s.emit(EventProbeResult, probeEvent{Session: session, Index: i, Result: s.Probe(urls[i], nil, proxyChoice)})
 				}
 			}()
 		}
@@ -101,13 +115,124 @@ func (s *Service) AddDownload(req core.AddRequest) (core.Job, error) { return s.
 
 func (s *Service) CreateBatch(req core.BatchRequest) (core.Batch, error) { return s.M.AddBatch(req) }
 
-func (s *Service) Pause(ids []string)                            { s.M.Pause(ids) }
-func (s *Service) Resume(ids []string)                           { s.M.Resume(ids) }
-func (s *Service) Remove(ids []string, deleteFiles bool)         { s.M.Remove(ids, deleteFiles) }
-func (s *Service) RetryFailed(batchID string)                    { s.M.RetryFailed(batchID) }
-func (s *Service) UpdateBatch(b core.Batch)                      { s.M.UpdateBatch(b) }
-func (s *Service) SetSpeedLimit(bps int64)                       { s.M.SetSpeedLimit(bps) }
-func (s *Service) UpdateSettings(st core.Settings) core.Settings { return s.M.UpdateSettings(st) }
+func (s *Service) Pause(ids []string)                    { s.M.Pause(ids) }
+func (s *Service) Resume(ids []string)                   { s.M.Resume(ids) }
+func (s *Service) Remove(ids []string, deleteFiles bool) { s.M.Remove(ids, deleteFiles) }
+func (s *Service) RetryFailed(batchID string)            { s.M.RetryFailed(batchID) }
+func (s *Service) UpdateBatch(b core.Batch)              { s.M.UpdateBatch(b) }
+func (s *Service) SetSpeedLimit(bps int64)               { s.M.SetSpeedLimit(bps) }
+func (s *Service) UpdateSettings(st core.Settings) core.Settings {
+	for i := range st.Proxies {
+		if st.Proxies[i].ID == "" {
+			st.Proxies[i].ID = core.NewID()
+		}
+	}
+	for i := range st.Subscriptions {
+		if st.Subscriptions[i].ID == "" {
+			st.Subscriptions[i].ID = core.NewID()
+		}
+	}
+	return s.M.UpdateSettings(st)
+}
+
+// ---------- network: links and proxies ----------
+
+// LinkInfo is a network link plus whether multi-link downloads use it.
+type LinkInfo struct {
+	links.Link
+	Enabled bool `json:"enabled"`
+}
+
+// ListLinks returns the device's network connections.
+func (s *Service) ListLinks() []LinkInfo {
+	st := s.M.Settings()
+	var out []LinkInfo
+	for _, l := range links.List() {
+		out = append(out, LinkInfo{Link: l, Enabled: netpath.Enabled(st, l)})
+	}
+	return out
+}
+
+// LinkCheck is the result of a reachability test through one link.
+type LinkCheck struct {
+	LatencyMs int64  `json:"latencyMs"`
+	Error     string `json:"error,omitempty"`
+}
+
+// CheckLinks tests every link in parallel by opening a connection through it.
+func (s *Service) CheckLinks() map[string]LinkCheck {
+	ls := links.List()
+	out := make(map[string]LinkCheck, len(ls))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, l := range ls {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
+			defer cancel()
+			d, err := links.Check(ctx, l, "1.1.1.1:443")
+			if err != nil {
+				d, err = links.Check(ctx, l, "cloudflare.com:443")
+			}
+			c := LinkCheck{LatencyMs: d.Milliseconds()}
+			if err != nil {
+				c = LinkCheck{Error: "no internet through this connection"}
+			}
+			mu.Lock()
+			out[l.ID] = c
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
+// ProxyParse is the result of reading proxy links or a subscription.
+type ProxyParse struct {
+	Profiles []core.ProxyProfile `json:"profiles"`
+	Errors   []string            `json:"errors"`
+}
+
+// ParseProxies reads pasted proxy URLs / share links (one per line, or a
+// base64 block) into new profiles with IDs. Nothing is saved.
+func (s *Service) ParseProxies(text string) ProxyParse {
+	ps, errs := proxy.ParseMany(text)
+	for i := range ps {
+		ps[i].ID = core.NewID()
+	}
+	return ProxyParse{Profiles: ps, Errors: errs}
+}
+
+// FetchSubscription downloads a subscription URL (through the given proxy
+// choice, "" = direct) and returns its servers. Nothing is saved.
+func (s *Service) FetchSubscription(subURL, via string) (ProxyParse, error) {
+	if via == "" {
+		via = "direct"
+	}
+	c, err := s.router.Client(via)
+	if err != nil {
+		return ProxyParse{}, err
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+	defer cancel()
+	ps, errs, err := proxy.FetchSubscription(ctx, c, strings.TrimSpace(subURL))
+	if err != nil {
+		return ProxyParse{Errors: errs}, err
+	}
+	for i := range ps {
+		ps[i].ID = core.NewID()
+	}
+	return ProxyParse{Profiles: ps, Errors: errs}, nil
+}
+
+// TestProxy checks a proxy by fetching a small page through it.
+func (s *Service) TestProxy(p core.ProxyProfile) proxy.TestResult {
+	return proxy.Test(s.ctx, &p, nil)
+}
+
+// XrayAvailable tells the UI whether V2Ray/Xray protocols are built in.
+func (s *Service) XrayAvailable() bool { return proxy.XrayAvailable }
 
 // CompletedPath returns the on-disk path of a finished download.
 func (s *Service) CompletedPath(id string) (string, error) {

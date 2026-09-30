@@ -174,7 +174,7 @@ func TestWorkStealingSplitsLargestSegment(t *testing.T) {
 	r.owned[big] = true
 	r.owned[small] = true
 
-	tail := r.take()
+	tail := r.take(nil)
 	if tail == nil {
 		t.Fatal("expected a split")
 	}
@@ -188,7 +188,7 @@ func TestWorkStealingSplitsLargestSegment(t *testing.T) {
 	big.Done = big.End - big.Start
 	tail.Done = tail.End - tail.Start
 	small.Done = small.End - small.Start
-	if s := r.take(); s != nil {
+	if s := r.take(nil); s != nil {
 		t.Fatalf("unexpected split %+v", *s)
 	}
 }

@@ -135,7 +135,16 @@
     {/if}
   </nav>
 
-  <div class="border-t border-line p-3">
+  <div class="space-y-0.5 border-t border-line p-3">
+    <button class="btn btn-ghost h-auto min-h-8 w-full justify-start gap-2.5 px-2.5 py-1.5" onclick={() => ((store.networkOpen = true), (store.navOpen = false))}>
+      <Icon name="globe" size={15} class="text-fg-3" />
+      <span class="min-w-0 flex-1 text-left">
+        Network
+        <span class="block truncate text-[11px] font-normal text-fg-3">
+          {store.activeLinks.length >= 2 ? `${store.activeLinks.length} connections` : 'One connection'} · {store.proxyName('')}
+        </span>
+      </span>
+    </button>
     <button class="btn btn-ghost h-8 w-full justify-start gap-2.5 px-2.5" onclick={() => ((store.settingsOpen = true), (store.navOpen = false))}>
       <Icon name="sliders" size={15} class="text-fg-3" />
       Settings

@@ -1,6 +1,6 @@
 import { SvelteSet } from 'svelte/reactivity'
 import { api } from './api'
-import type { Batch, Job, Progress, Settings, Status } from './types'
+import type { Batch, Job, NetLink, PathStat, Progress, Settings, Status } from './types'
 
 export type Filter =
   | { kind: 'all' }
@@ -50,7 +50,17 @@ class AppStore {
     categorizeByType: false,
     clipboardWatch: false,
     notifyOnComplete: true,
+    proxies: [],
+    subscriptions: [],
+    defaultProxy: '',
+    proxyBypass: ['localhost', '<local>'],
+    multiLink: false,
+    links: [],
   })
+  /** The device's network connections (refreshed by the Network panel). */
+  links = $state<NetLink[]>([])
+  /** Live per-route stats for each running download. */
+  paths = $state<Record<string, PathStat[]>>({})
   speed = $state<Record<string, number>>({})
   conns = $state<Record<string, number>>({})
   history = $state<number[]>(Array(HISTORY).fill(0))
@@ -68,6 +78,7 @@ class AppStore {
   addOpen = $state<{ url?: string } | null>(null)
   batchOpen = $state<{ text?: string; tab?: 'paste' | 'pattern' | 'import' } | null>(null)
   settingsOpen = $state(false)
+  networkOpen = $state(false)
   confirmRemove = $state<{ ids: string[]; label: string } | null>(null)
   toasts = $state<Toast[]>([])
   private toastSeq = 0
@@ -76,6 +87,23 @@ class AppStore {
   ordered = $derived(Object.values(this.jobs).sort((a, b) => a.position - b.position || a.createdAt - b.createdAt))
 
   totalSpeed = $derived(Object.values(this.speed).reduce((a, b) => a + b, 0))
+
+  /** Live speed per network link across all downloads. */
+  linkSpeed = $derived.by(() => {
+    const out: Record<string, number> = {}
+    for (const list of Object.values(this.paths)) for (const p of list) out[p.id] = (out[p.id] ?? 0) + p.speed
+    return out
+  })
+
+  /** Links that multi-link downloads will use right now. */
+  activeLinks = $derived(this.settings.multiLink ? this.links.filter((l) => l.enabled) : [])
+
+  proxyName(choice: string | undefined): string {
+    const c = choice || this.settings.defaultProxy
+    if (!c || c === 'direct') return 'Direct'
+    if (c === 'system') return 'System proxy'
+    return this.settings.proxies?.find((p) => p.id === c)?.name ?? 'Missing proxy'
+  }
 
   counts = $derived.by(() => {
     const c: StatusCounts = { all: 0, active: 0, queued: 0, paused: 0, completed: 0, failed: 0 }
@@ -197,8 +225,11 @@ class AppStore {
         j.segments = p.segments
         this.speed[p.id] = p.speed
         this.conns[p.id] = p.conns
+        if (p.paths?.length) this.paths[p.id] = p.paths
+        else delete this.paths[p.id]
       }
       for (const k of Object.keys(this.speed)) if (!live.has(k)) delete this.speed[k]
+      for (const k of Object.keys(this.paths)) if (!live.has(k)) delete this.paths[k]
       this.history = [...this.history.slice(1), list.reduce((a, p) => a + p.speed, 0)]
     })
     api.on('jobs:removed', (ids: string[]) => {
@@ -214,7 +245,12 @@ class AppStore {
       delete this.batches[bid]
       if (this.filter.kind === 'batch' && this.filter.id === bid) this.filter = { kind: 'all' }
     })
-    api.on('settings', (s: Settings) => (this.settings = s))
+    api.on('settings', (s: Settings) => {
+      this.settings = s
+      this.refreshLinks()
+    })
+    api.on('links', () => this.refreshLinks())
+    this.refreshLinks()
     api.on('job:done', (j: Job) => {
       const b = j.batchId ? this.batchStats[j.batchId] : null
       if (b && b.completed + b.failed === b.total) {
@@ -240,6 +276,14 @@ class AppStore {
         this.history = [...this.history.slice(1), 0]
       }
     }, 400)
+  }
+
+  async refreshLinks() {
+    try {
+      this.links = (await api.listLinks()) ?? []
+    } catch {
+      /* older backend */
+    }
   }
 
   // ---------- actions ----------

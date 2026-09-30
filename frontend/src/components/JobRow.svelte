@@ -84,7 +84,13 @@
 
     {#if showBar}
       <div class="mt-2 max-w-[640px]">
-        <SegmentBar segments={job.segments} size={job.size} downloaded={job.downloaded} status={job.status} />
+        <SegmentBar
+          segments={job.segments}
+          size={job.size}
+          downloaded={job.downloaded}
+          status={job.status}
+          routes={store.paths[job.id]?.map((p) => p.id)}
+        />
       </div>
     {/if}
   </div>

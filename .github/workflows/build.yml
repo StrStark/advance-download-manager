@@ -82,7 +82,6 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018" >/dev/null
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
           go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
-          go get golang.org/x/mobile/bind@latest
           cd frontend && npm ci
       - run: gomobile init && scripts/build-android.sh debug
       - uses: actions/upload-artifact@v4

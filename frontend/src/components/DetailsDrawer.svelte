@@ -8,11 +8,18 @@
   import { store, isRunning } from '../lib/store.svelte'
   import { api } from '../lib/api'
   import { bytes, eta, percent, speed } from '../lib/format'
+  import { linkIcon, routeColors } from '../lib/icons'
 
   const job = $derived(store.detailsId ? store.jobs[store.detailsId] : null)
   const sp = $derived(job ? (store.speed[job.id] ?? 0) : 0)
   const segs = $derived(job?.segments ? [...job.segments].sort((a, b) => a.start - b.start) : [])
   const batch = $derived(job?.batchId ? store.batches[job.batchId] : null)
+  const paths = $derived(job ? (store.paths[job.id] ?? []) : [])
+  const pathTotal = $derived(paths.reduce((a, p) => a + p.speed, 0))
+  const pathColor = (id: string | undefined) => {
+    const i = paths.findIndex((p) => p.id === id)
+    return i >= 0 && paths.length > 1 ? routeColors[i % routeColors.length] : null
+  }
   let copied = $state('')
 
   function copy(text: string, key: string) {
@@ -63,7 +70,14 @@
           </span>
           <span class="num text-[12px] text-fg-3">{bytes(job.downloaded)} / {bytes(job.size)}</span>
         </div>
-        <SegmentBar segments={job.segments} size={job.size} downloaded={job.downloaded} status={job.status} tall />
+        <SegmentBar
+          segments={job.segments}
+          size={job.size}
+          downloaded={job.downloaded}
+          status={job.status}
+          routes={paths.map((p) => p.id)}
+          tall
+        />
         {#if job.error}
           <div class="mt-3 flex gap-2 rounded-lg bg-bad-soft px-3 py-2 text-[12px] text-bad">
             <Icon name="alert" size={14} class="mt-px" />
@@ -81,6 +95,34 @@
         {/each}
       </div>
 
+      <!-- connections (multi-link / proxy) -->
+      {#if paths.length}
+        <div>
+          <h3 class="mb-2 text-[12px] font-semibold text-fg-2">Connections</h3>
+          <div class="space-y-2">
+            {#each paths as p, i (p.id)}
+              {@const share = pathTotal > 0 ? (p.speed / pathTotal) * 100 : 0}
+              <div class="rounded-lg border border-line px-2.5 py-2">
+                <div class="flex items-center gap-2 text-[12px]">
+                  <span class="size-2 shrink-0 rounded-full" style="background:{paths.length > 1 ? routeColors[i % routeColors.length] : 'var(--accent)'}"></span>
+                  <Icon name={linkIcon[p.kind] ?? 'globe'} size={13} class="shrink-0 text-fg-3" />
+                  <span class="min-w-0 flex-1 truncate text-fg-2" title={p.label}>{p.label || 'Default route'}</span>
+                  <span class="num shrink-0 text-accent-2">{speed(p.speed)}</span>
+                </div>
+                {#if paths.length > 1}
+                  <div class="mt-1.5 flex items-center gap-2">
+                    <div class="h-1 flex-1 overflow-hidden rounded-full bg-track">
+                      <div class="h-full rounded-full transition-[width] duration-300" style="width:{share}%; background:{routeColors[i % routeColors.length]}"></div>
+                    </div>
+                    <span class="num w-16 text-right text-[10.5px] text-fg-3">{Math.round(share)}% · {p.conns}c</span>
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
       <!-- segments -->
       {#if segs.length > 1}
         <div>
@@ -97,7 +139,7 @@
                 <div class="h-1 overflow-hidden rounded-full bg-track">
                   <div
                     class="h-full rounded-full transition-[width] duration-300"
-                    style="width:{p}%; background:{p >= 100 ? 'var(--ok)' : i % 2 ? 'var(--seg-b)' : 'var(--seg-a)'}"
+                    style="width:{p}%; background:{p >= 100 ? 'var(--ok)' : (pathColor(s.path) ?? (i % 2 ? 'var(--seg-b)' : 'var(--seg-a)'))}"
                   ></div>
                 </div>
                 <span class="num text-right text-fg-3">{bytes(len, 0)}</span>
@@ -127,6 +169,10 @@
         {@render row('Saved to', `${job.dir}/${job.filename}`, 'path')}
         {@render row('Source', job.url, 'url')}
         {#if job.finalUrl && job.finalUrl !== job.url}{@render row('Redirected to', job.finalUrl, 'final')}{/if}
+        <div>
+          <dt class="text-fg-3">Connects through</dt>
+          <dd class="mt-0.5 text-fg-2">{store.proxyName(job.proxy)}</dd>
+        </div>
         <div class="grid grid-cols-2 gap-2.5">
           <div>
             <dt class="text-fg-3">Resumable</dt>

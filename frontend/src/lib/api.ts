@@ -1,4 +1,18 @@
-import type { AddRequest, Batch, BatchRequest, ImportItem, Job, ProbeResult, Settings, State } from './types'
+import type {
+  AddRequest,
+  Batch,
+  BatchRequest,
+  ImportItem,
+  Job,
+  LinkCheck,
+  NetLink,
+  ProbeResult,
+  ProxyParse,
+  ProxyProfile,
+  ProxyTest,
+  Settings,
+  State,
+} from './types'
 import { createMockBackend } from './mock'
 
 /**
@@ -15,9 +29,9 @@ export interface Backend {
   readonly kind: BackendKind
   getState(): Promise<State>
   addDownload(req: AddRequest): Promise<Job>
-  probe(url: string, headers?: Record<string, string>): Promise<ProbeResult>
+  probe(url: string, headers?: Record<string, string>, proxy?: string): Promise<ProbeResult>
   /** Probes asynchronously; results arrive as `probe:result` events. */
-  probeMany(session: string, urls: string[]): Promise<void>
+  probeMany(session: string, urls: string[], proxy?: string): Promise<void>
   extractURLs(text: string): Promise<string[]>
   expandPattern(pattern: string): Promise<string[]>
   /** Must be called directly from a click handler (the browser needs a user gesture). */
@@ -38,6 +52,13 @@ export interface Backend {
   diskFree(dir: string): Promise<number>
   /** URLs passed on the command line at launch (returned once). */
   pendingURLs(): Promise<string[]>
+  // ---- network ----
+  listLinks(): Promise<NetLink[]>
+  checkLinks(): Promise<Record<string, LinkCheck>>
+  parseProxies(text: string): Promise<ProxyParse>
+  fetchSubscription(url: string, via: string): Promise<ProxyParse>
+  testProxy(p: ProxyProfile): Promise<ProxyTest>
+  xrayAvailable(): Promise<boolean>
   on(event: string, cb: (data: any) => void): () => void
 }
 
@@ -66,8 +87,8 @@ function createDesktopBackend(): Backend {
     kind: 'desktop',
     getState: () => app().GetState(),
     addDownload: (r) => app().AddDownload(r),
-    probe: (u, h) => app().Probe(u, h ?? {}),
-    probeMany: (s, u) => app().ProbeMany(s, u),
+    probe: (u, h, p) => app().Probe(u, h ?? {}, p ?? ''),
+    probeMany: (s, u, p) => app().ProbeMany(s, u, p ?? ''),
     extractURLs: (t) => app().ExtractURLs(t),
     expandPattern: (p) => app().ExpandPattern(p),
     importFile: () => app().ImportFile(),
@@ -85,6 +106,12 @@ function createDesktopBackend(): Backend {
     setSpeedLimit: (b) => app().SetSpeedLimit(b),
     diskFree: (d) => app().DiskFree(d),
     pendingURLs: () => app().PendingURLs(),
+    listLinks: () => app().ListLinks(),
+    checkLinks: () => app().CheckLinks(),
+    parseProxies: (t) => app().ParseProxies(t),
+    fetchSubscription: (u, v) => app().FetchSubscription(u, v),
+    testProxy: (p) => app().TestProxy(p),
+    xrayAvailable: () => app().XrayAvailable(),
     on: (ev, cb) => window.runtime!.EventsOn(ev, cb),
   }
 }
@@ -123,8 +150,8 @@ function createServerBackend(kind: 'server' | 'android'): Backend {
     kind,
     getState: () => call('GetState'),
     addDownload: (r) => call('AddDownload', r),
-    probe: (u, h) => call('Probe', u, h ?? {}),
-    probeMany: (s, u) => call('ProbeMany', s, u),
+    probe: (u, h, p) => call('Probe', u, h ?? {}, p ?? ''),
+    probeMany: (s, u, p) => call('ProbeMany', s, u, p ?? ''),
     extractURLs: (t) => call('ExtractURLs', t),
     expandPattern: (p) => call('ExpandPattern', p),
     importFile: () =>
@@ -162,6 +189,12 @@ function createServerBackend(kind: 'server' | 'android'): Backend {
     setSpeedLimit: (b) => call('SetSpeedLimit', b),
     diskFree: (d) => call('DiskFree', d),
     pendingURLs: async () => [],
+    listLinks: () => call('ListLinks'),
+    checkLinks: () => call('CheckLinks'),
+    parseProxies: (t) => call('ParseProxies', t),
+    fetchSubscription: (u, v) => call('FetchSubscription', u, v),
+    testProxy: (p) => call('TestProxy', p),
+    xrayAvailable: () => call('XrayAvailable'),
     on(ev, cb) {
       if (!listeners.has(ev)) listeners.set(ev, new Set())
       listeners.get(ev)!.add(cb)

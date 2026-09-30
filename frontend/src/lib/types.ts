@@ -5,6 +5,8 @@ export interface Segment {
   start: number
   end: number
   done: number
+  /** Route (network link) this segment uses when downloading over several. */
+  path?: string
 }
 
 export interface Job {
@@ -28,6 +30,8 @@ export interface Job {
   connections: number
   segments: Segment[] | null
   headers?: Record<string, string>
+  /** "" = default, "direct", "system", or a proxy profile ID */
+  proxy?: string
   position: number
   retries: number
   createdAt: number
@@ -55,6 +59,66 @@ export interface Settings {
   categorizeByType: boolean
   clipboardWatch: boolean
   notifyOnComplete: boolean
+  proxies: ProxyProfile[] | null
+  subscriptions: Subscription[] | null
+  defaultProxy: string
+  proxyBypass: string[] | null
+  multiLink: boolean
+  links: string[] | null
+}
+
+export type ProxyType = 'http' | 'https' | 'socks5' | 'vmess' | 'vless' | 'trojan' | 'shadowsocks'
+
+export interface ProxyProfile {
+  id: string
+  name: string
+  type: ProxyType
+  url: string
+  server?: string
+  subscriptionId?: string
+}
+
+export interface Subscription {
+  id: string
+  name: string
+  url: string
+  updatedAt: number
+}
+
+export type LinkKind = 'ethernet' | 'wifi' | 'cellular' | 'usb' | 'vpn' | 'other'
+
+export interface NetLink {
+  id: string
+  name: string
+  label: string
+  kind: LinkKind
+  addrs: string[] | null
+  enabled: boolean
+}
+
+export interface LinkCheck {
+  latencyMs: number
+  error?: string
+}
+
+export interface ProxyTest {
+  ok: boolean
+  latencyMs: number
+  ip?: string
+  error?: string
+}
+
+export interface ProxyParse {
+  profiles: ProxyProfile[] | null
+  errors: string[] | null
+}
+
+export interface PathStat {
+  id: string
+  label: string
+  kind: string
+  speed: number
+  conns: number
 }
 
 export interface Progress {
@@ -65,6 +129,7 @@ export interface Progress {
   speed: number
   segments: Segment[] | null
   conns: number
+  paths?: PathStat[] | null
 }
 
 export interface ProbeResult {
@@ -87,6 +152,7 @@ export interface AddRequest {
   headers?: Record<string, string>
   paused?: boolean
   size?: number
+  proxy?: string
 }
 
 export interface BatchRequest {
@@ -96,6 +162,7 @@ export interface BatchRequest {
   sequential: boolean
   connections: number
   paused: boolean
+  proxy?: string
   items: AddRequest[]
 }
 

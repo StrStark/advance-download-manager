@@ -5,6 +5,7 @@
   import Icon from './Icon.svelte'
   import FileTile from './FileTile.svelte'
   import Toggle from './Toggle.svelte'
+  import ProxySelect from './ProxySelect.svelte'
   import { store } from '../lib/store.svelte'
   import { api } from '../lib/api'
   import { bytes, host } from '../lib/format'
@@ -24,6 +25,7 @@
   let cookie = $state('')
   let userAgent = $state('')
   let extra = $state('')
+  let proxy = $state('')
 
   let probe = $state<ProbeResult | null>(null)
   let probing = $state(false)
@@ -47,6 +49,7 @@
   // Debounced probe whenever the URL changes.
   $effect(() => {
     const u = url.trim()
+    const via = proxy
     probe = null
     if (!valid) return
     untrack(() => {
@@ -56,7 +59,7 @@
     probing = true
     const t = setTimeout(async () => {
       try {
-        const r = await api.probe(u, headers())
+        const r = await api.probe(u, headers(), via)
         if (my !== seq) return
         probe = r
         if (!nameTouched && r.filename) filename = r.filename
@@ -85,6 +88,7 @@
         connections: probe && !probe.resumable ? 1 : connections,
         headers: headers(),
         paused,
+        proxy,
         size: probe?.size && probe.size > 0 ? probe.size : 0,
       }),
       'Could not add download',
@@ -169,6 +173,11 @@
         disabled={!!probe && !probe.resumable}
         class="mt-2 w-full accent-[var(--accent)]"
       />
+    </div>
+
+    <div>
+      <label class="label" for="add-proxy">Connect through</label>
+      <ProxySelect id="add-proxy" bind:value={proxy} />
     </div>
 
     <Toggle bind:checked={paused} label="Add paused" hint="Queue it without starting" />

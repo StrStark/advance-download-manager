@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Segment, Status } from '../lib/types'
+  import { routeColors } from '../lib/icons'
 
   let {
     segments,
@@ -7,7 +8,21 @@
     downloaded,
     status,
     tall = false,
-  }: { segments: Segment[] | null; size: number; downloaded: number; status: Status; tall?: boolean } = $props()
+    routes = [],
+  }: { segments: Segment[] | null; size: number; downloaded: number; status: Status; tall?: boolean; routes?: string[] } = $props()
+
+  // With several connections, each segment takes its connection's color.
+  const routeIndex = $derived.by(() => {
+    const order = [...routes]
+    for (const s of segments ?? []) if (s.path && !order.includes(s.path)) order.push(s.path)
+    return order.length > 1 ? new Map(order.map((id, i) => [id, i])) : null
+  })
+  const colorFor = (s: Segment, i: number) =>
+    routeIndex && s.path !== undefined && routeIndex.has(s.path)
+      ? routeColors[routeIndex.get(s.path)! % routeColors.length]
+      : i % 2
+        ? 'var(--seg-b)'
+        : 'var(--seg-a)'
 
   const tone = $derived(
     status === 'failed' ? 'var(--bad)' : status === 'paused' ? 'var(--warn)' : status === 'completed' ? 'var(--ok)' : null,
@@ -31,7 +46,7 @@
       {@const w = (Math.min(s.done, s.end - s.start + 1) / size) * 100}
       <div
         class="absolute inset-y-0 transition-[width] duration-300 ease-out"
-        style="left:{left}%; width:{w}%; background:{tone ?? (i % 2 ? 'var(--seg-b)' : 'var(--seg-a)')}; opacity:{tone ? 0.9 : 1}"
+        style="left:{left}%; width:{w}%; background:{tone ?? colorFor(s, i)}; opacity:{tone ? 0.9 : 1}"
       ></div>
       {#if i > 0 && tall}
         <div class="absolute inset-y-0 w-px bg-bg/70" style="left:{left}%"></div>

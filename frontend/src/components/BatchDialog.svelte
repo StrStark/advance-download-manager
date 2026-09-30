@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte'
+  import { onDestroy, untrack } from 'svelte'
   import { SvelteSet } from 'svelte/reactivity'
   import Modal from './Modal.svelte'
   import Icon from './Icon.svelte'
   import FileTile from './FileTile.svelte'
   import Toggle from './Toggle.svelte'
+  import ProxySelect from './ProxySelect.svelte'
   import { store } from '../lib/store.svelte'
   import { api } from '../lib/api'
   import { bytes, ext, host } from '../lib/format'
@@ -45,6 +46,7 @@
   let connections = $state(store.settings.defaultConnections)
   let sequential = $state(false)
   let paused = $state(false)
+  let proxy = $state('')
   let submitting = $state(false)
   let session = ''
   let unsub: (() => void) | null = null
@@ -102,6 +104,20 @@
     exts.clear()
     name = defaultName(list)
     step = 'review'
+  }
+
+  // Probe (again) whenever the review step opens or the proxy choice changes.
+  $effect(() => {
+    if (step !== 'review') return
+    const via = proxy
+    untrack(() => probeAll(via))
+  })
+
+  function probeAll(via: string) {
+    for (const it of items) {
+      it.status = 'pending'
+      it.error = undefined
+    }
     session = Math.random().toString(36).slice(2)
     unsub?.()
     const mine = session
@@ -121,7 +137,7 @@
         it.resumable = r.resumable
       }
     })
-    api.probeMany(mine, items.map((i) => i.url))
+    api.probeMany(mine, items.map((i) => i.url), via)
   }
   onDestroy(() => unsub?.())
 
@@ -245,6 +261,7 @@
         sequential,
         connections,
         paused,
+        proxy,
         items: reqItems,
       }),
       'Could not create batch',
@@ -470,6 +487,10 @@
             <label class="label" for="b-con">Connections each</label>
             <input id="b-con" type="number" min="1" max="32" class="field h-8 num" bind:value={connections} />
           </div>
+        </div>
+        <div>
+          <label class="label" for="b-proxy">Connect through</label>
+          <ProxySelect id="b-proxy" bind:value={proxy} />
         </div>
         <Toggle bind:checked={sequential} label="One at a time, in order" />
         <Toggle bind:checked={paused} label="Add paused" />

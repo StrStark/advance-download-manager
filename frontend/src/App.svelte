@@ -10,6 +10,7 @@
   import BatchDialog from './components/BatchDialog.svelte'
   import SettingsDialog from './components/SettingsDialog.svelte'
   import ConfirmRemove from './components/ConfirmRemove.svelte'
+  import NetworkDialog from './components/NetworkDialog.svelte'
   import Toasts from './components/Toasts.svelte'
   import Icon from './components/Icon.svelte'
   import { store, isRunning } from './lib/store.svelte'
@@ -34,7 +35,7 @@
     document.documentElement.dataset.theme = t === 'system' ? (systemDark ? 'dark' : 'light') : t
   })
 
-  const modalOpen = $derived(!!(store.addOpen || store.batchOpen || store.settingsOpen || store.confirmRemove))
+  const modalOpen = $derived(!!(store.addOpen || store.batchOpen || store.settingsOpen || store.networkOpen || store.confirmRemove))
 
   // Picking a view in the drawer closes it (narrow screens).
   $effect(() => {
@@ -49,6 +50,7 @@
     else if (store.addOpen) store.addOpen = null
     else if (store.batchOpen) store.batchOpen = null
     else if (store.settingsOpen) store.settingsOpen = false
+    else if (store.networkOpen) store.networkOpen = false
     else if (store.navOpen) store.navOpen = false
     else if (store.detailsId) store.detailsId = null
     else if (store.selected.size) store.selected.clear()
@@ -185,6 +187,7 @@
 {#if store.addOpen}<AddDialog initialUrl={store.addOpen.url} />{/if}
 {#if store.batchOpen}<BatchDialog initialText={store.batchOpen.text} initialTab={store.batchOpen.tab} />{/if}
 {#if store.settingsOpen}<SettingsDialog />{/if}
+{#if store.networkOpen}<NetworkDialog />{/if}
 {#if store.confirmRemove}<ConfirmRemove ids={store.confirmRemove.ids} label={store.confirmRemove.label} />{/if}
 <Toasts />
 
