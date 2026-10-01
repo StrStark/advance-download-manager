@@ -1,5 +1,8 @@
 import type {
   AddRequest,
+  AppInfo,
+  ExternalDownload,
+  UpdateInfo,
   Batch,
   BatchRequest,
   ImportItem,
@@ -59,6 +62,13 @@ export interface Backend {
   fetchSubscription(url: string, via: string): Promise<ProxyParse>
   testProxy(p: ProxyProfile): Promise<ProxyTest>
   xrayAvailable(): Promise<boolean>
+  // ---- app ----
+  appInfo(): Promise<AppInfo>
+  checkUpdate(): Promise<UpdateInfo>
+  /** Downloads and installs the update; progress arrives as `update:progress`. */
+  installUpdate(): Promise<void>
+  /** Browser downloads handed over at launch (returned once). */
+  pendingDownloads(): Promise<ExternalDownload[]>
   on(event: string, cb: (data: any) => void): () => void
 }
 
@@ -112,6 +122,10 @@ function createDesktopBackend(): Backend {
     fetchSubscription: (u, v) => app().FetchSubscription(u, v),
     testProxy: (p) => app().TestProxy(p),
     xrayAvailable: () => app().XrayAvailable(),
+    appInfo: () => app().AppInfo(),
+    checkUpdate: () => app().CheckUpdate(),
+    installUpdate: () => app().InstallUpdate(),
+    pendingDownloads: () => app().PendingDownloads(),
     on: (ev, cb) => window.runtime!.EventsOn(ev, cb),
   }
 }
@@ -195,6 +209,10 @@ function createServerBackend(kind: 'server' | 'android'): Backend {
     fetchSubscription: (u, v) => call('FetchSubscription', u, v),
     testProxy: (p) => call('TestProxy', p),
     xrayAvailable: () => call('XrayAvailable'),
+    appInfo: () => call('AppInfo'),
+    checkUpdate: () => call('CheckUpdate'),
+    installUpdate: () => call('InstallUpdate'),
+    pendingDownloads: async () => [],
     on(ev, cb) {
       if (!listeners.has(ev)) listeners.set(ev, new Set())
       listeners.get(ev)!.add(cb)

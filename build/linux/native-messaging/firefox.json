@@ -1,0 +1,7 @@
+{
+  "name": "io.github.adm",
+  "description": "ADM download manager",
+  "path": "/usr/bin/adm",
+  "type": "stdio",
+  "allowed_extensions": ["adm@strstark.github.io"]
+}

@@ -7,9 +7,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 
+	"github.com/StrStark/advance-download-manager/internal/autostart"
+	"github.com/StrStark/advance-download-manager/internal/browser"
 	"github.com/StrStark/advance-download-manager/internal/core"
 	"github.com/StrStark/advance-download-manager/internal/platform"
+	"github.com/StrStark/advance-download-manager/internal/version"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -26,8 +30,23 @@ var assets embed.FS
 var icon []byte
 
 func main() {
+	args := os.Args[1:]
+	// Started by a browser extension as a native messaging host: forward the
+	// download to the app (launching it if needed) and exit. No window.
+	if browser.IsHostInvocation(args) {
+		if err := browser.RunHost(os.Stdin, os.Stdout, version.Version, browser.ForwardToApp); err != nil {
+			os.Exit(1)
+		}
+		return
+	}
+
 	m := core.NewManager(core.NewStore(filepath.Join(platform.DataDir(), "state.json")), nil)
-	app := NewApp(m, os.Args[1:])
+	app := NewApp(m, args)
+
+	startState := options.Normal
+	if slices.Contains(args, autostart.BackgroundFlag) {
+		startState = options.Minimised // started at login: stay out of the way
+	}
 
 	err := wails.Run(&options.App{
 		Title:            "ADM",
@@ -37,6 +56,7 @@ func main() {
 		MinHeight:        580,
 		AssetServer:      &assetserver.Options{Assets: assets},
 		BackgroundColour: &options.RGBA{R: 9, G: 12, B: 23, A: 255},
+		WindowStartState: startState,
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		Bind:             []any{app},

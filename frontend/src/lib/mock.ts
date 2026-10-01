@@ -68,6 +68,9 @@ export function createMockBackend(): Backend {
     proxyBypass: ['localhost', '<local>'],
     multiLink: true,
     links: [],
+    autostart: false,
+    onboarded: false,
+    noUpdateCheck: false,
   }
   const netLinks: Omit<NetLink, 'enabled'>[] = [
     { id: 'eno1', name: 'eno1', label: 'Ethernet (eno1)', kind: 'ethernet', addrs: ['192.168.1.20'] },
@@ -427,6 +430,31 @@ export function createMockBackend(): Backend {
     },
     async xrayAvailable() {
       return true
+    },
+    async appInfo() {
+      return { version: '0.2.0', shell: 'desktop', os: 'linux', arch: 'amd64', install: 'deb', canUpdateInApp: true, repoUrl: 'https://github.com/StrStark/advance-download-manager' }
+    },
+    async checkUpdate() {
+      await wait(600)
+      const release = {
+        version: '0.3.0',
+        name: 'ADM 0.3.0',
+        notes: '### Highlights\n- Faster multi-link balancing\n- New proxy test view',
+        url: 'https://github.com/StrStark/advance-download-manager/releases/tag/v0.3.0',
+        publishedAt: new Date().toISOString(),
+        assets: [{ name: 'adm_0.3.0_linux_amd64.deb', url: '#', size: 14_200_000 }],
+      }
+      return { current: '0.2.0', available: true, release, asset: release.assets[0] }
+    },
+    async installUpdate() {
+      const total = 14_200_000
+      for (let done = 0; done <= total; done += 1_400_000) {
+        emit('update:progress', { done: Math.min(done, total), total })
+        await wait(180)
+      }
+    },
+    async pendingDownloads() {
+      return []
     },
     on(ev, cb) {
       if (!listeners.has(ev)) listeners.set(ev, new Set())

@@ -1,6 +1,6 @@
 import { SvelteSet } from 'svelte/reactivity'
 import { api } from './api'
-import type { Batch, Job, NetLink, PathStat, Progress, Settings, Status } from './types'
+import type { AppInfo, Batch, ExternalDownload, Job, NetLink, PathStat, Progress, Settings, Status, UpdateInfo } from './types'
 
 export type Filter =
   | { kind: 'all' }
@@ -56,7 +56,15 @@ class AppStore {
     proxyBypass: ['localhost', '<local>'],
     multiLink: false,
     links: [],
+    autostart: false,
+    onboarded: true,
+    noUpdateCheck: false,
   })
+  app = $state<AppInfo | null>(null)
+  update = $state<UpdateInfo | null>(null)
+  /** null when idle; bytes while downloading an update. */
+  updateProgress = $state<{ done: number; total: number } | null>(null)
+  onboardingOpen = $state(false)
   /** The device's network connections (refreshed by the Network panel). */
   links = $state<NetLink[]>([])
   /** Live per-route stats for each running download. */
@@ -75,7 +83,10 @@ class AppStore {
   /** Sidebar drawer on narrow screens. */
   navOpen = $state(false)
 
-  addOpen = $state<{ url?: string } | null>(null)
+  /** The add dialog; from the browser it arrives with filename, size and session headers. */
+  addOpen = $state<{ url?: string; filename?: string; size?: number; headers?: Record<string, string>; fromBrowser?: boolean } | null>(null)
+  /** Browser downloads waiting while the add dialog is busy. */
+  incoming = $state<ExternalDownload[]>([])
   batchOpen = $state<{ text?: string; tab?: 'paste' | 'pattern' | 'import' } | null>(null)
   settingsOpen = $state(false)
   networkOpen = $state(false)
@@ -267,6 +278,22 @@ class AppStore {
     }
     api.on('external:urls', openUrls)
     api.pendingURLs().then(openUrls).catch(() => {})
+    api.on('external:download', (d: ExternalDownload) => this.fromBrowser(d))
+    api.pendingDownloads().then((ds) => ds?.forEach((d) => this.fromBrowser(d))).catch(() => {})
+
+    // App info, first-run questions and update notices.
+    api.appInfo().then((info) => {
+      this.app = info
+      if (info.shell === 'desktop' && !this.settings.onboarded) this.onboardingOpen = true
+    }).catch(() => {})
+    api.on('update:available', (u: UpdateInfo) => {
+      this.update = u
+      this.toast('info', `ADM ${u.release?.version} is available`, 'See Settings → About to update', {
+        label: 'Details',
+        run: () => (this.settingsOpen = true),
+      })
+    })
+    api.on('update:progress', (p: { done: number; total: number }) => (this.updateProgress = p))
     api.on('clipboard:url', (url: string) => {
       this.toast('info', 'Link copied', url, { label: 'Download', run: () => (this.addOpen = { url }) })
     })
@@ -276,6 +303,39 @@ class AppStore {
         this.history = [...this.history.slice(1), 0]
       }
     }, 400)
+  }
+
+  /** A download caught by the browser extension: show it in the add dialog. */
+  fromBrowser(d: ExternalDownload) {
+    if (this.addOpen) {
+      this.incoming = [...this.incoming, d]
+      return
+    }
+    const headers: Record<string, string> = {}
+    if (d.referrer) headers['Referer'] = d.referrer
+    if (d.cookies) headers['Cookie'] = d.cookies
+    if (d.userAgent) headers['User-Agent'] = d.userAgent
+    this.addOpen = { url: d.url, filename: d.filename, size: d.size, headers, fromBrowser: true }
+  }
+
+  /** Called when the add dialog closes: show the next waiting browser download. */
+  nextIncoming() {
+    const [next, ...rest] = this.incoming
+    this.incoming = rest
+    if (next) setTimeout(() => this.fromBrowser(next), 150)
+  }
+
+  async checkUpdate(): Promise<UpdateInfo | undefined> {
+    const u = await this.run(api.checkUpdate(), 'Could not check for updates')
+    if (u) this.update = u
+    return u
+  }
+
+  async installUpdate() {
+    this.updateProgress = { done: 0, total: this.update?.asset?.size ?? 0 }
+    const ok = await this.run(api.installUpdate().then(() => true), 'Update failed')
+    if (!ok) this.updateProgress = null
+    else if (this.app?.shell !== 'desktop') this.updateProgress = null
   }
 
   async refreshLinks() {

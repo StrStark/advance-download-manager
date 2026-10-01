@@ -37,6 +37,7 @@ NAS.
 - 🛰️ **Proxies built in:** HTTP, SOCKS5 and V2Ray/Xray (VLESS, VMess, Trojan, Shadowsocks, REALITY) with subscriptions
 - ✨ **Actually nice to use:** live segment map, speed graph, dark and light themes, keyboard-first
 - 🌍 **Everywhere:** native desktop apps, an Android app, and a Docker image with a web UI
+- 🧩 **Browser capture:** an extension hands browser downloads to ADM; ADM starts at login and updates itself
 
 <br/>
 
@@ -86,6 +87,8 @@ NAS.
 <td width="50%" valign="top">
 
 ### 🧩 Integration
+- **Browser extension** (Chrome, Edge, Brave, Vivaldi, Firefox): catches downloads and hands them to ADM with your session cookies; *Download with ADM* on any link
+- **Start at login** (asked on first run) and **self-updating** from GitHub Releases
 - **Linux**: app launcher entry, notifications, `adm <url>` hands links to the running app
 - **Android**: foreground service, **Share → ADM** from any app, saves to `Download/ADM`
 - **Server**: HTTP API + server-sent events, Basic auth, downloads confined to one folder
@@ -150,17 +153,24 @@ NAS.
 
 ## 🏁 Get started
 
-| Platform | How |
-| --- | --- |
-| 🐧 **Linux** | [Build](#linux) → `make install` adds ADM to your app launcher |
-| 🪟 **Windows** | [Build](#windows--macos) `adm.exe` (also cross-compiles from Linux) |
-| 🍎 **macOS** | [Build](#windows--macos) on a Mac, or grab the CI artifact |
-| 🤖 **Android** | [Build](#android) the APK, or grab the CI artifact |
-| 🐳 **Docker** | `ADM_PASSWORD=… docker compose up -d` → http://localhost:8080 |
+**[⬇ Download the latest release](https://github.com/StrStark/advance-download-manager/releases/latest)**
 
-> Every push to `main` builds Linux, Windows, macOS and Android binaries plus the Docker image in
-> [GitHub Actions](https://github.com/StrStark/advance-download-manager/actions/workflows/build.yml):
-> download them from the run's **Artifacts**.
+| Platform | Download |
+| --- | --- |
+| 🪟 **Windows** 10/11 | `…_windows_amd64_setup.exe` installer |
+| 🐧 **Debian / Ubuntu** and derivatives | `…_linux_amd64.deb`: `sudo apt install ./adm_*_linux_amd64.deb` |
+| 🐧 Other Linux | `…_linux_amd64` portable binary |
+| 🍎 **macOS** (Apple Silicon + Intel) | `…_macos_universal.dmg` |
+| 🤖 **Android** 8.0+ | `…_android_arm64-v8a.apk` (most phones) |
+| 🐳 **Docker** | `docker pull ghcr.io/strstark/advance-download-manager` |
+| 🧩 **Browser extension** | `adm-browser-extension_…_chrome.zip` / `…_firefox.zip` |
+
+After that, ADM **updates itself**: it checks GitHub daily and installs new versions from
+**Settings → About & updates**. On the first run it asks whether to **start at login**, and with the
+**browser extension** your downloads open straight in ADM (with your login cookies).
+
+> First launch: Windows SmartScreen and macOS Gatekeeper warn about apps that aren't code-signed by a paid
+> certificate yet. Use *More info → Run anyway* (Windows) or *right-click → Open* (macOS).
 
 ### 🐳 Docker (headless server)
 
@@ -289,6 +299,14 @@ adb install -r build/bin/adm-android-universal-debug.apk
 Android 8.0+. APKs are split per CPU type, plus a universal APK. Release builds are signed from
 `android/keystore.properties` when present.
 
+### Releasing
+
+Push a version tag and GitHub Actions builds every installer and publishes the release:
+
+```bash
+git tag v1.2.3 && git push origin v1.2.3
+```
+
 ### Server only
 
 ```bash
@@ -352,6 +370,10 @@ internal/platform/     per-OS: open/reveal files, notifications, disk space, dat
 internal/links/        network interfaces + per-OS socket pinning (multi-link)
 internal/proxy/        HTTP/SOCKS5 + embedded Xray-core, share links, subscriptions
 internal/netpath/      picks routes (links × proxy) for each download
+internal/browser/      native-messaging host + browser registration
+internal/update/       GitHub release check, download, per-OS install
+internal/autostart/    start at login (XDG autostart, Run key, LaunchAgent)
+browser-extension/     Manifest V3 extension (Chromium + Firefox)
 mobile/                Android engine (gomobile bind)
 android/               Kotlin app: WebView, foreground service, share target
 frontend/              Svelte 5 + TypeScript + Tailwind CSS v4
@@ -371,13 +393,15 @@ Data lives in `~/.local/share/adm` (Linux), `~/Library/Application Support/ADM` 
 - [x] Desktop apps (Linux / Windows / macOS), Android app, Docker server
 - [x] Proxies: HTTP, SOCKS5, V2Ray/Xray (VLESS, VMess, Trojan, Shadowsocks, REALITY), subscriptions
 - [x] Combine network connections (multi-link), including Wi-Fi + mobile data on Android
-- [ ] Browser extension (Chrome / Firefox) to capture downloads
+- [x] Browser extension (Chrome / Edge / Brave / Firefox) to capture downloads
+- [x] Installers (setup.exe, .deb, .dmg, APK), start at login, in-app updates from GitHub Releases
+- [ ] Publish the extension on the Chrome Web Store and addons.mozilla.org
 - [ ] Queues with schedules (e.g. download 02:00–07:00) and per-host limits in the UI
 - [ ] System tray and a `adm` command-line client
 - [ ] BitTorrent / magnet links, FTP / SFTP
 - [ ] HLS / DASH streams and an optional `yt-dlp` backend
 - [ ] Page link grabber ("download all links on this page")
-- [ ] Signed release binaries and a Flathub package
+- [ ] Code-signed Windows/macOS builds and a Flathub package
 
 Ideas and feedback are welcome in [issues](https://github.com/StrStark/advance-download-manager/issues).
 

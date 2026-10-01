@@ -48,6 +48,9 @@ type Listener interface {
 	// OnMultiLinkChanged tells the app whether to keep extra networks (e.g.
 	// mobile data next to Wi-Fi) connected for multi-link downloads.
 	OnMultiLinkChanged(enabled bool)
+	// OnInstallUpdate asks the app to open the system installer for a
+	// downloaded APK.
+	OnInstallUpdate(apkPath string)
 }
 
 type engine struct {
@@ -94,6 +97,15 @@ func Start(dataDir, downloadDir string) (string, error) {
 	e := &engine{hub: httpapi.NewHub()}
 	e.m = core.NewManager(core.NewStore(filepath.Join(dataDir, "state.json")), events{e})
 	e.svc = service.New(e.m)
+	e.svc.SetShell("android", filepath.Join(dataDir, "updates"))
+	e.svc.Installer = func(path string) error {
+		l := e.getListener()
+		if l == nil {
+			return errors.New("the app is not ready to install updates")
+		}
+		l.OnInstallUpdate(path)
+		return nil
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	e.cancel = cancel
 	if err := e.svc.Attach(ctx, e.hub.Emit); err != nil {

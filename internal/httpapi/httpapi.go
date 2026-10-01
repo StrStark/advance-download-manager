@@ -257,6 +257,12 @@ func dispatch(cfg Config, s *service.Service, method string, a []json.RawMessage
 		bps, err := arg[int64](a, 0)
 		s.SetSpeedLimit(bps)
 		return nil, err
+	case "AppInfo":
+		return s.AppInfo(), nil
+	case "CheckUpdate":
+		return s.CheckUpdate()
+	case "InstallUpdate":
+		return nil, s.InstallUpdate()
 	case "ListLinks":
 		return s.ListLinks(), nil
 	case "CheckLinks":

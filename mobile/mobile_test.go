@@ -28,6 +28,7 @@ func (r *recorder) OnProgress(int, int64, int64, int64) {
 	r.mu.Unlock()
 }
 func (r *recorder) OnMultiLinkChanged(bool) {}
+func (r *recorder) OnInstallUpdate(string)  {}
 
 func (r *recorder) OnDownloadComplete(name, path string, inBatch bool) {
 	r.mu.Lock()

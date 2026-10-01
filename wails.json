@@ -7,8 +7,10 @@
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "info": {
+    "companyName": "StrStark",
     "productName": "ADM",
-    "productVersion": "0.1.0",
+    "productVersion": "0.0.0",
+    "copyright": "\u00a9 2026 StrStark. MIT License.",
     "comments": "Advance Download Manager"
   }
 }

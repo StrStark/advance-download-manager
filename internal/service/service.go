@@ -6,6 +6,7 @@ package service
 import (
 	"context"
 	"errors"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,8 @@ import (
 	"github.com/StrStark/advance-download-manager/internal/netpath"
 	"github.com/StrStark/advance-download-manager/internal/platform"
 	"github.com/StrStark/advance-download-manager/internal/proxy"
+	"github.com/StrStark/advance-download-manager/internal/update"
+	"github.com/StrStark/advance-download-manager/internal/version"
 )
 
 // Event names emitted by the service itself (the engine's are in core).
@@ -23,6 +26,9 @@ const (
 	EventProbeResult = "probe:result"
 	EventClipboard   = "clipboard:url"
 	EventExternal    = "external:urls"
+	EventDownload    = "external:download" // a download handed over by the browser
+	EventUpdate      = "update:available"
+	EventUpdateProg  = "update:progress"
 )
 
 // Service wraps a Manager with UI-facing operations.
@@ -31,6 +37,14 @@ type Service struct {
 	router *netpath.Router
 	ctx    context.Context
 	emit   func(name string, data any)
+
+	shell     string // "desktop" | "server" | "android"
+	updateDir string
+	// Installer applies a downloaded update (set by shells that can).
+	Installer func(path string) error
+
+	updMu  sync.Mutex
+	latest *update.Release
 }
 
 func New(m *core.Manager) *Service {
@@ -42,7 +56,120 @@ func New(m *core.Manager) *Service {
 // Attach connects the service to a running UI and starts the engine.
 func (s *Service) Attach(ctx context.Context, emit func(string, any)) error {
 	s.ctx, s.emit = ctx, emit
-	return s.M.Start(ctx)
+	if err := s.M.Start(ctx); err != nil {
+		return err
+	}
+	go s.updateLoop(ctx)
+	return nil
+}
+
+// SetShell records which app hosts the service ("desktop", "server",
+// "android") and where updates are downloaded to.
+func (s *Service) SetShell(shell, updateDir string) {
+	s.shell, s.updateDir = shell, updateDir
+}
+
+// AppInfo describes the running build for the About screen.
+type AppInfo struct {
+	Version        string      `json:"version"`
+	Shell          string      `json:"shell"`
+	OS             string      `json:"os"`
+	Arch           string      `json:"arch"`
+	Install        update.Kind `json:"install"`
+	CanUpdateInApp bool        `json:"canUpdateInApp"`
+	RepoURL        string      `json:"repoUrl"`
+}
+
+func (s *Service) AppInfo() AppInfo {
+	k := update.Detect(s.shell)
+	return AppInfo{
+		Version: version.Version, Shell: s.shell, OS: runtime.GOOS, Arch: runtime.GOARCH, Install: k,
+		CanUpdateInApp: s.Installer != nil && k != update.Container && k != update.Server,
+		RepoURL:        "https://github.com/" + version.Repo,
+	}
+}
+
+// UpdateInfo is the result of an update check.
+type UpdateInfo struct {
+	Current   string          `json:"current"`
+	Available bool            `json:"available"`
+	Release   *update.Release `json:"release,omitempty"`
+	Asset     *update.Asset   `json:"asset,omitempty"`
+}
+
+// CheckUpdate asks GitHub for the latest release (through the default proxy).
+func (s *Service) CheckUpdate() (UpdateInfo, error) {
+	info := UpdateInfo{Current: version.Version}
+	c, err := s.router.Client("")
+	if err != nil {
+		return info, err
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, 20*time.Second)
+	defer cancel()
+	r, err := update.Latest(ctx, c)
+	if err != nil {
+		return info, err
+	}
+	s.updMu.Lock()
+	s.latest = r
+	s.updMu.Unlock()
+	info.Release = r
+	info.Available = update.Newer(r.Version, version.Version)
+	info.Asset = update.PickAsset(r, update.Detect(s.shell))
+	return info, nil
+}
+
+// InstallUpdate downloads the update for this platform and hands it to the
+// shell's installer (which usually restarts the app).
+func (s *Service) InstallUpdate() error {
+	if s.Installer == nil {
+		return errors.New("update this installation with your package manager or container tooling")
+	}
+	s.updMu.Lock()
+	r := s.latest
+	s.updMu.Unlock()
+	if r == nil {
+		if _, err := s.CheckUpdate(); err != nil {
+			return err
+		}
+		s.updMu.Lock()
+		r = s.latest
+		s.updMu.Unlock()
+	}
+	a := update.PickAsset(r, update.Detect(s.shell))
+	if a == nil {
+		return errors.New("this release has no package for your system")
+	}
+	c, err := s.router.Client("")
+	if err != nil {
+		return err
+	}
+	path, err := update.Download(s.ctx, c, r, a, s.updateDir, func(done, total int64) {
+		s.emit(EventUpdateProg, map[string]int64{"done": done, "total": total})
+	})
+	if err != nil {
+		return err
+	}
+	return s.Installer(path)
+}
+
+// updateLoop checks for a new version shortly after start and once a day.
+func (s *Service) updateLoop(ctx context.Context) {
+	t := time.NewTimer(15 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		if !s.M.Settings().NoUpdateCheck {
+			if info, err := s.CheckUpdate(); err == nil && info.Available {
+				s.emit(EventUpdate, info)
+			}
+		}
+		t.Reset(24 * time.Hour)
+	}
 }
 
 // Emit sends an event to the attached UI.

@@ -12,18 +12,21 @@
   import { filenameFromURL } from '../lib/batchutil'
   import type { ProbeResult } from '../lib/types'
 
-  let { initialUrl = '' }: { initialUrl?: string } = $props()
+  type Initial = { url?: string; filename?: string; size?: number; headers?: Record<string, string>; fromBrowser?: boolean }
+  let { initial = {} }: { initial?: Initial } = $props()
+  // Values come from where the dialog was opened (e.g. the browser extension).
+  const init = untrack(() => initial)
 
-  let url = $state(initialUrl)
-  let filename = $state('')
-  let nameTouched = $state(false)
+  let url = $state(init.url ?? '')
+  let filename = $state(init.filename ?? '')
+  let nameTouched = $state(!!init.filename)
   let dir = $state(store.settings.downloadDir)
   let connections = $state(store.settings.defaultConnections)
   let paused = $state(false)
   let advanced = $state(false)
-  let referer = $state('')
-  let cookie = $state('')
-  let userAgent = $state('')
+  let referer = $state(init.headers?.['Referer'] ?? '')
+  let cookie = $state(init.headers?.['Cookie'] ?? '')
+  let userAgent = $state(init.headers?.['User-Agent'] ?? '')
   let extra = $state('')
   let proxy = $state('')
 
@@ -72,6 +75,11 @@
     return () => clearTimeout(t)
   })
 
+  function close() {
+    store.addOpen = null
+    store.nextIncoming()
+  }
+
   async function browse() {
     const d = await store.run(api.chooseDirectory(dir))
     if (d) dir = d
@@ -89,19 +97,25 @@
         headers: headers(),
         paused,
         proxy,
-        size: probe?.size && probe.size > 0 ? probe.size : 0,
+        size: probe?.size && probe.size > 0 ? probe.size : (init.size ?? 0),
       }),
       'Could not add download',
     )
     submitting = false
     if (j) {
-      store.addOpen = null
+      close()
       store.filter = { kind: 'all' }
     }
   }
 </script>
 
-<Modal title="New download" subtitle="Paste a link. We'll check it before starting." onclose={() => (store.addOpen = null)}>
+<Modal
+  title={init.fromBrowser ? 'Download from your browser' : 'New download'}
+  subtitle={init.fromBrowser
+    ? 'Caught by the ADM extension. Your browser session (cookies, referrer) comes along.'
+    : "Paste a link. We'll check it before starting."}
+  onclose={close}
+>
   <form
     class="space-y-4"
     onsubmit={(e) => {
@@ -218,7 +232,7 @@
   </form>
 
   {#snippet footer()}
-    <button class="btn btn-ghost" onclick={() => (store.addOpen = null)}>Cancel</button>
+    <button class="btn btn-ghost" onclick={close}>Cancel</button>
     <button class="btn btn-primary min-w-[120px]" disabled={!valid || submitting || !!probe?.error} onclick={submit}>
       <Icon name="download" size={15} />{paused ? 'Add paused' : 'Download'}
     </button>

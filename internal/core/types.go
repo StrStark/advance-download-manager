@@ -102,6 +102,11 @@ type Settings struct {
 	// empty means every connected link.
 	MultiLink bool     `json:"multiLink"`
 	Links     []string `json:"links"`
+
+	// Desktop integration.
+	Autostart     bool `json:"autostart"`     // start at login (only set with the user's consent)
+	Onboarded     bool `json:"onboarded"`     // the first-run questions were answered
+	NoUpdateCheck bool `json:"noUpdateCheck"` // don't look for new versions automatically
 }
 
 // ProxyProfile is one proxy server. URL is either a proxy URL

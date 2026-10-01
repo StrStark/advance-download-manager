@@ -136,6 +136,15 @@
   </nav>
 
   <div class="space-y-0.5 border-t border-line p-3">
+    {#if store.update?.available}
+      <button
+        class="mb-1.5 flex w-full items-center gap-2.5 rounded-lg bg-accent-soft px-2.5 py-2 text-left text-[12.5px] text-accent-hi transition-colors hover:brightness-110"
+        onclick={() => ((store.settingsOpen = true), (store.navOpen = false))}
+      >
+        <Icon name="download" size={15} />
+        <span class="flex-1">Update to {store.update.release?.version}</span>
+      </button>
+    {/if}
     <button class="btn btn-ghost h-auto min-h-8 w-full justify-start gap-2.5 px-2.5 py-1.5" onclick={() => ((store.networkOpen = true), (store.navOpen = false))}>
       <Icon name="globe" size={15} class="text-fg-3" />
       <span class="min-w-0 flex-1 text-left">

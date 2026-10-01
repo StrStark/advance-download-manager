@@ -65,6 +65,52 @@ export interface Settings {
   proxyBypass: string[] | null
   multiLink: boolean
   links: string[] | null
+  autostart: boolean
+  onboarded: boolean
+  noUpdateCheck: boolean
+}
+
+export interface AppInfo {
+  version: string
+  shell: 'desktop' | 'server' | 'android' | 'mock'
+  os: string
+  arch: string
+  install: 'deb' | 'portable' | 'windows' | 'macos' | 'android' | 'container' | 'server'
+  canUpdateInApp: boolean
+  repoUrl: string
+}
+
+export interface ReleaseAsset {
+  name: string
+  url: string
+  size: number
+}
+
+export interface Release {
+  version: string
+  name: string
+  notes: string
+  url: string
+  publishedAt: string
+  assets: ReleaseAsset[] | null
+}
+
+export interface UpdateInfo {
+  current: string
+  available: boolean
+  release?: Release
+  asset?: ReleaseAsset
+}
+
+/** A download handed over by the browser extension. */
+export interface ExternalDownload {
+  url: string
+  filename?: string
+  referrer?: string
+  cookies?: string
+  userAgent?: string
+  size?: number
+  mime?: string
 }
 
 export type ProxyType = 'http' | 'https' | 'socks5' | 'vmess' | 'vless' | 'trojan' | 'shadowsocks'

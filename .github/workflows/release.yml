@@ -1,0 +1,137 @@
+# Builds installers for every platform and publishes a GitHub Release when a
+# version tag is pushed:   git tag v1.2.3 && git push origin v1.2.3
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  LDFLAGS_VERSION: github.com/StrStark/advance-download-manager/internal/version.Version
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04 # older glibc = runs on more distributions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+      - name: Build
+        run: |
+          V="${GITHUB_REF_NAME#v}"; echo "V=$V" >> "$GITHUB_ENV"
+          jq --arg v "$V" '.info.productVersion = $v' wails.json > w.tmp && mv w.tmp wails.json
+          wails build -tags webkit2_41 -trimpath -ldflags "-X $LDFLAGS_VERSION=$V" -o adm
+          mkdir -p dist
+          cp build/bin/adm "dist/adm_${V}_linux_amd64"
+          VERSION="$V" ARCH=amd64 nfpm package -f build/linux/nfpm.yaml -p deb -t dist/
+          mv dist/adm_*_amd64.deb "dist/adm_${V}_linux_amd64.deb"
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOARCH=$arch go build -tags server -trimpath -ldflags "-s -w -X $LDFLAGS_VERSION=$V" -o "dist/adm-server_${V}_linux_${arch}" .
+          done
+          scripts/package-extension.sh "$V" dist
+      - uses: actions/upload-artifact@v4
+        with: { name: linux, path: dist/* }
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+      - name: Build installer
+        shell: bash
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          jq --arg v "$V" '.info.productVersion = $v' wails.json > w.tmp && mv w.tmp wails.json
+          wails build -platform windows/amd64 -nsis -trimpath -ldflags "-X $LDFLAGS_VERSION=$V"
+          mkdir -p dist
+          mv build/bin/*-installer.exe "dist/adm_${V}_windows_amd64_setup.exe"
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: dist/* }
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+      - name: Build app and disk image
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          jq --arg v "$V" '.info.productVersion = $v' wails.json > w.tmp && mv w.tmp wails.json
+          wails build -platform darwin/universal -trimpath -ldflags "-X $LDFLAGS_VERSION=$V"
+          scripts/package-macos.sh "$V" dist
+      - uses: actions/upload-artifact@v4
+        with: { name: macos, path: dist/* }
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Tools
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018" >/dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
+          (cd frontend && npm ci)
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/adm-release.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/adm-release.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/keystore.properties
+      - name: Build APKs
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          gomobile init
+          VERSION="$V" scripts/build-android.sh release
+          mkdir -p dist
+          for abi in arm64-v8a armeabi-v7a x86_64 universal; do
+            mv "build/bin/adm-android-${abi}-release.apk" "dist/adm_${V}_android_${abi}.apk"
+          done
+      - uses: actions/upload-artifact@v4
+        with: { name: android, path: dist/* }
+
+  publish:
+    needs: [linux, windows, macos, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          cd dist && sha256sum * > SHA256SUMS && cd ..
+          flags=(--title "ADM $V" --generate-notes)
+          [[ "$V" == *-* ]] && flags+=(--prerelease)
+          [[ -f docs/release-notes.md ]] && flags+=(--notes-file docs/release-notes.md)
+          gh release create "$GITHUB_REF_NAME" dist/* "${flags[@]}"

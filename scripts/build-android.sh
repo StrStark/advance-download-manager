@@ -6,10 +6,15 @@
 # Output: build/bin/adm-android-*.apk
 #
 # Usage: scripts/build-android.sh [debug|release]      (default: debug)
+#   VERSION=1.2.3 stamps the version (default: 0.0.0-dev).
 # Needs the tools from scripts/setup-android-tools.sh.
 set -euo pipefail
 
 variant="${1:-debug}"
+version="${VERSION:-0.0.0-dev}"
+IFS=. read -r vmaj vmin vpat <<<"${version%%-*}"
+version_code=$(( ${vmaj:-0} * 10000 + ${vmin:-0} * 100 + ${vpat:-0} ))
+(( version_code > 0 )) || version_code=1
 root="$(cd "$(dirname "$0")/.." && pwd)"
 [[ -f "$HOME/.adm-android-env" ]] && source "$HOME/.adm-android-env"
 : "${ANDROID_HOME:?Android SDK not found; run scripts/setup-android-tools.sh first}"
@@ -25,7 +30,7 @@ mkdir -p "$root/android/app/libs"
 (cd "$root" && gomobile bind \
   -target=android/arm64,android/arm,android/amd64 \
   -androidapi 26 \
-  -ldflags="-s -w" -trimpath \
+  -ldflags="-s -w -X github.com/StrStark/advance-download-manager/internal/version.Version=$version" -trimpath \
   -o android/app/libs/admmobile.aar ./mobile)
 
 echo "==> APK ($variant)"
@@ -42,7 +47,7 @@ if [[ ! -x ./gradlew ]]; then
 fi
 echo "sdk.dir=$ANDROID_HOME" > local.properties
 task="assemble${variant^}"
-./gradlew "$task" --no-daemon
+./gradlew "$task" --no-daemon -PadmVersionName="$version" -PadmVersionCode="$version_code"
 
 mkdir -p "$root/build/bin"
 for apk in app/build/outputs/apk/"$variant"/*.apk; do

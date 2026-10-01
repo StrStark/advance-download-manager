@@ -1,0 +1,40 @@
+# Debian/Ubuntu package. Built by the release workflow:
+#   VERSION=1.2.3 ARCH=amd64 nfpm package -f build/linux/nfpm.yaml -p deb -t build/bin/
+name: adm
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: net
+priority: optional
+maintainer: StrStark <112777814+StrStark@users.noreply.github.com>
+homepage: https://github.com/StrStark/advance-download-manager
+license: MIT
+description: |
+  Fast, modern download manager.
+  Segmented multi-connection downloads, batch downloading, proxies
+  (HTTP, SOCKS5, V2Ray/Xray) and combining several network connections.
+depends:
+  - libgtk-3-0t64 | libgtk-3-0
+  - libwebkit2gtk-4.1-0
+recommends:
+  - policykit-1 | polkitd
+contents:
+  - src: build/bin/adm
+    dst: /usr/bin/adm
+    file_info: { mode: 0755 }
+  - src: build/linux/adm.desktop
+    dst: /usr/share/applications/adm.desktop
+  - src: build/appicon.png
+    dst: /usr/share/icons/hicolor/512x512/apps/adm.png
+  # Let browser extensions reach ADM for every user on the machine.
+  - src: build/linux/native-messaging/chrome.json
+    dst: /etc/opt/chrome/native-messaging-hosts/io.github.adm.json
+  - src: build/linux/native-messaging/chrome.json
+    dst: /etc/chromium/native-messaging-hosts/io.github.adm.json
+  - src: build/linux/native-messaging/chrome.json
+    dst: /etc/opt/edge/native-messaging-hosts/io.github.adm.json
+  - src: build/linux/native-messaging/firefox.json
+    dst: /usr/lib/mozilla/native-messaging-hosts/io.github.adm.json
+scripts:
+  postinstall: build/linux/postinst.sh
+  postremove: build/linux/postinst.sh

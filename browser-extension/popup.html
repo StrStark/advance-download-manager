@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: light dark; --bg: #ffffff; --fg: #0f1426; --mute: #6a7493; --line: #e1e4ee; --accent: #4f46e5; --ok: #059669; --bad: #dc2626; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #11172a; --fg: #e9ecf5; --mute: #8d97b5; --line: #1f2842; --accent: #6366f1; --ok: #34d399; --bad: #f87171; } }
+  body { margin: 0; width: 280px; font: 13px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  header { display: flex; align-items: center; gap: 10px; padding: 14px 14px 10px; }
+  header img { width: 28px; height: 28px; border-radius: 8px; }
+  header b { font-size: 14px; display: block; }
+  header span { color: var(--mute); font-size: 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--line); }
+  .status { padding: 10px 14px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--mute); }
+  .status .ok { color: var(--ok); } .status .bad { color: var(--bad); }
+  a { color: var(--accent); }
+  input[type=checkbox] { width: 34px; height: 18px; accent-color: var(--accent); }
+</style>
+</head>
+<body>
+  <header>
+    <img src="icons/48.png" alt="" />
+    <div><b>ADM</b><span>Download manager</span></div>
+  </header>
+  <label class="row">Send downloads to ADM <input id="enabled" type="checkbox" /></label>
+  <div class="status" id="status">Checking ADM…</div>
+  <script src="popup.js"></script>
+</body>
+</html>

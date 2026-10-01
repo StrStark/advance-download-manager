@@ -5,12 +5,21 @@
   import { store } from '../lib/store.svelte'
   import { api } from '../lib/api'
   import { parseBytes, bytes } from '../lib/format'
+  import BrowserSetup from './BrowserSetup.svelte'
+  import appIcon from '../../../build/appicon.png'
   import type { Settings } from '../lib/types'
   import type { IconName } from '../lib/icons'
 
   let s = $state<Settings>(structuredClone($state.snapshot(store.settings)))
   let limitText = $state(store.settings.speedLimit ? bytes(store.settings.speedLimit).replace(' ', '') : '')
   const limitValid = $derived(!limitText.trim() || parseBytes(limitText) !== null)
+
+  let checking = $state(false)
+  async function check() {
+    checking = true
+    await store.checkUpdate()
+    checking = false
+  }
 
   async function browse() {
     const d = await store.run(api.chooseDirectory(s.downloadDir))
@@ -111,6 +120,83 @@
         <Toggle bind:checked={s.clipboardWatch} label="Watch clipboard for links" hint="Offer to download when you copy a URL" />
         <Toggle bind:checked={s.notifyOnComplete} label="Desktop notifications" hint="When a download or batch finishes" />
       {/if}
+    </section>
+
+    {#if store.app?.shell === 'desktop'}
+      <section>
+        <h3 class="mb-1 text-[11px] font-semibold tracking-[0.08em] text-fg-3 uppercase">Startup</h3>
+        <Toggle bind:checked={s.autostart} label="Start ADM when I log in" hint="Opens minimised to resume downloads and catch browser links" />
+      </section>
+
+      <section>
+        <h3 class="mb-2 text-[11px] font-semibold tracking-[0.08em] text-fg-3 uppercase">Browser extension</h3>
+        <BrowserSetup />
+      </section>
+    {/if}
+
+    <section>
+      <h3 class="mb-2 text-[11px] font-semibold tracking-[0.08em] text-fg-3 uppercase">About &amp; updates</h3>
+      <div class="rounded-xl border border-line bg-surface-2 p-3.5">
+        <div class="flex items-center gap-3">
+          <img src={appIcon} alt="" class="size-10 rounded-xl" />
+          <div class="min-w-0 flex-1">
+            <div class="text-[13.5px] font-semibold">ADM <span class="num font-normal text-fg-2">{store.app?.version ?? ''}</span></div>
+            <div class="text-[12px] text-fg-3">
+              {#if store.update?.available}
+                <span class="text-accent-hi">Version {store.update.release?.version} is available</span>
+              {:else if store.update}
+                You're up to date
+              {:else}
+                {store.app ? `${store.app.os} · ${store.app.arch}` : ''}
+              {/if}
+            </div>
+          </div>
+          {#if store.update?.available && store.app?.canUpdateInApp}
+            <button class="btn btn-primary h-8" disabled={!!store.updateProgress} onclick={() => store.installUpdate()}>
+              <Icon name="download" size={14} />Update
+            </button>
+          {:else}
+            <button class="btn btn-outline h-8" disabled={checking} onclick={check}>
+              <Icon name={checking ? 'loader' : 'refresh'} size={14} class={checking ? 'animate-spin' : ''} />Check
+            </button>
+          {/if}
+        </div>
+
+        {#if store.updateProgress}
+          {@const p = store.updateProgress}
+          <div class="mt-3">
+            <div class="h-1.5 overflow-hidden rounded-full bg-track">
+              <div class="h-full rounded-full bg-accent transition-[width] duration-200" style="width:{p.total ? (p.done / p.total) * 100 : 5}%"></div>
+            </div>
+            <p class="mt-1.5 text-[11.5px] text-fg-3">
+              {p.total && p.done >= p.total ? 'Installing… ADM will restart.' : `Downloading update · ${bytes(p.done)} of ${bytes(p.total)}`}
+            </p>
+          </div>
+        {/if}
+
+        {#if store.update?.available && !store.app?.canUpdateInApp}
+          <p class="mt-3 rounded-lg bg-surface px-3 py-2 font-mono text-[11.5px] text-fg-2">
+            {#if store.app?.install === 'container'}docker compose pull &amp;&amp; docker compose up -d{:else}Download the new version from the release page.{/if}
+          </p>
+        {/if}
+
+        {#if store.update?.available && store.update.release?.notes}
+          <details class="mt-3 text-[12px] text-fg-2">
+            <summary class="cursor-pointer text-fg-3">What's new</summary>
+            <pre class="mt-2 max-h-40 overflow-y-auto font-sans whitespace-pre-wrap">{store.update.release.notes}</pre>
+          </details>
+        {/if}
+
+        <div class="mt-3 flex items-center justify-between border-t border-line pt-2.5 text-[12px]">
+          <label class="flex cursor-pointer items-center gap-2 text-fg-2">
+            <input type="checkbox" checked={!s.noUpdateCheck} onchange={(e) => (s.noUpdateCheck = !e.currentTarget.checked)} class="accent-[var(--accent)]" />
+            Check for updates automatically
+          </label>
+          {#if store.app}
+            <a class="text-accent-hi underline-offset-2 hover:underline" href={store.app.repoUrl + '/releases'} target="_blank" rel="noreferrer">Release notes</a>
+          {/if}
+        </div>
+      </div>
     </section>
   </div>
 

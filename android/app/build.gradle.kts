@@ -23,8 +23,9 @@ android {
         applicationId = "io.github.adm"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // Release builds pass these from the git tag (see scripts/build-android.sh).
+        versionCode = (project.findProperty("admVersionCode") as String?)?.toInt() ?: 1
+        versionName = (project.findProperty("admVersionName") as String?) ?: "0.0.0-dev"
     }
 
     signingConfigs {

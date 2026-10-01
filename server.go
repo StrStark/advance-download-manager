@@ -49,6 +49,7 @@ func main() {
 	hub := httpapi.NewHub()
 	m := core.NewManager(core.NewStore(filepath.Join(platform.DataDir(), "state.json")), hub)
 	svc := service.New(m)
+	svc.SetShell("server", "")
 	if err := svc.Attach(ctx, hub.Emit); err != nil {
 		log.Fatalf("load state: %v", err)
 	}

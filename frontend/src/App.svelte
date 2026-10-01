@@ -11,6 +11,7 @@
   import SettingsDialog from './components/SettingsDialog.svelte'
   import ConfirmRemove from './components/ConfirmRemove.svelte'
   import NetworkDialog from './components/NetworkDialog.svelte'
+  import OnboardingDialog from './components/OnboardingDialog.svelte'
   import Toasts from './components/Toasts.svelte'
   import Icon from './components/Icon.svelte'
   import { store, isRunning } from './lib/store.svelte'
@@ -35,7 +36,18 @@
     document.documentElement.dataset.theme = t === 'system' ? (systemDark ? 'dark' : 'light') : t
   })
 
-  const modalOpen = $derived(!!(store.addOpen || store.batchOpen || store.settingsOpen || store.networkOpen || store.confirmRemove))
+  const modalOpen = $derived(
+    !!(store.addOpen || store.batchOpen || store.settingsOpen || store.networkOpen || store.onboardingOpen || store.confirmRemove),
+  )
+
+  // In the desktop app, links that open a new tab go to the system browser.
+  function onclick(e: MouseEvent) {
+    const a = (e.target as HTMLElement).closest?.('a[target="_blank"]') as HTMLAnchorElement | null
+    if (a && window.runtime?.BrowserOpenURL) {
+      e.preventDefault()
+      window.runtime.BrowserOpenURL(a.href)
+    }
+  }
 
   // Picking a view in the drawer closes it (narrow screens).
   $effect(() => {
@@ -47,7 +59,10 @@
   // app go to the background.
   window.__admBack = () => {
     if (store.confirmRemove) store.confirmRemove = null
-    else if (store.addOpen) store.addOpen = null
+    else if (store.addOpen) {
+      store.addOpen = null
+      store.nextIncoming()
+    }
     else if (store.batchOpen) store.batchOpen = null
     else if (store.settingsOpen) store.settingsOpen = false
     else if (store.networkOpen) store.networkOpen = false
@@ -133,6 +148,7 @@
 </script>
 
 <svelte:window
+  {onclick}
   {onkeydown}
   {onpaste}
   ondragenter={(e) => {
@@ -184,10 +200,11 @@
   <Icon name="plus" size={24} stroke={2.4} />
 </button>
 
-{#if store.addOpen}<AddDialog initialUrl={store.addOpen.url} />{/if}
+{#if store.addOpen}{#key store.addOpen}<AddDialog initial={store.addOpen} />{/key}{/if}
 {#if store.batchOpen}<BatchDialog initialText={store.batchOpen.text} initialTab={store.batchOpen.tab} />{/if}
 {#if store.settingsOpen}<SettingsDialog />{/if}
 {#if store.networkOpen}<NetworkDialog />{/if}
+{#if store.onboardingOpen}<OnboardingDialog />{/if}
 {#if store.confirmRemove}<ConfirmRemove ids={store.confirmRemove.ids} label={store.confirmRemove.label} />{/if}
 <Toasts />
 

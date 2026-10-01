@@ -12,4 +12,5 @@
     <string name="notif_timeout_text">Android limits background transfers. Tap to resume.</string>
     <string name="engine_failed">ADM could not start: %1$s</string>
     <string name="no_app_to_open">No app can open this file</string>
+    <string name="allow_installs">Allow ADM to install updates, then tap Update again</string>
 </resources>

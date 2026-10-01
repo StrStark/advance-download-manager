@@ -3,7 +3,12 @@ package io.github.adm
 import admmobile.Admmobile
 import admmobile.Listener
 import android.content.Context
+import android.content.Intent
 import android.media.MediaScannerConnection
+import android.net.Uri
+import android.provider.Settings
+import android.widget.Toast
+import androidx.core.content.FileProvider
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -46,6 +51,28 @@ object Engine : Listener {
 
     override fun onProgress(active: Long, bytesPerSec: Long, downloaded: Long, total: Long) {
         main.post { DownloadService.instance?.showProgress(active, bytesPerSec, downloaded, total) }
+    }
+
+    /** Opens Android's installer for a downloaded update. */
+    override fun onInstallUpdate(apkPath: String) {
+        main.post {
+            val pm = app.packageManager
+            if (!pm.canRequestPackageInstalls()) {
+                // Android asks once per app: "Allow installing from ADM".
+                Toast.makeText(app, R.string.allow_installs, Toast.LENGTH_LONG).show()
+                app.startActivity(
+                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${app.packageName}"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                return@post
+            }
+            val uri = FileProvider.getUriForFile(app, "${app.packageName}.files", File(apkPath))
+            app.startActivity(
+                Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
     }
 
     override fun onMultiLinkChanged(enabled: Boolean) {
