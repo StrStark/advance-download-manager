@@ -6,7 +6,7 @@
   import { api } from '../lib/api'
   import { parseBytes, bytes } from '../lib/format'
   import BrowserSetup from './BrowserSetup.svelte'
-  import appIcon from '../../../build/appicon.png'
+  import appIcon from '../assets/appicon.png'
   import type { Settings } from '../lib/types'
   import type { IconName } from '../lib/icons'
 
