@@ -50,6 +50,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+      - name: NSIS
+        shell: bash
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" >> "$GITHUB_PATH"
       - name: Build installer
         shell: bash
         run: |

@@ -7,6 +7,7 @@ version="${1:-0.0.0}"
 out="${2:-$root/dist}"
 ext_version="${version%%-*}" # browsers want plain dotted numbers
 mkdir -p "$out"
+out="$(cd "$out" && pwd)" # absolute: the zip step runs from a temp dir
 tmp="$(mktemp -d)"
 for target in chrome firefox; do
   dir="$tmp/$target"
